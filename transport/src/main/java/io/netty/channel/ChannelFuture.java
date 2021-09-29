@@ -161,6 +161,11 @@ import java.util.concurrent.TimeUnit;
  *     // Connection established successfully
  * }
  * </pre>
+ *
+ * Channel，EventLoop和ChannelFuture可以被认为是Netty网络抽象的代表。
+ *      Channel -> Socket
+ *      EventLop -> 控制流，多线程处理，并发
+ *      ChannelFuture -> 异步通知
  */
 public interface ChannelFuture extends Future<Void> {
 
@@ -170,6 +175,11 @@ public interface ChannelFuture extends Future<Void> {
      */
     Channel channel();
 
+    /**
+     * 这玩意注册的时候listener的时候会判断事件是否完成，完成了的话直接调用lestener的回调方法。
+     * @param listener
+     * @return
+     */
     @Override
     ChannelFuture addListener(GenericFutureListener<? extends Future<? super Void>> listener);
 

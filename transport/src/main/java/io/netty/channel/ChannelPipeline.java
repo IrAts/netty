@@ -218,9 +218,14 @@ import java.util.NoSuchElementException;
  * A {@link ChannelHandler} can be added or removed at any time because a {@link ChannelPipeline} is thread safe.
  * For example, you can insert an encryption handler when sensitive information is about to be exchanged, and remove it
  * after the exchange.
+ *
+ * ChannelPipeline 实现了一种常见的设计模式 — 拦截过滤器（Intercepting Filter）。
+ * UNIX 管道是另外一个熟悉的例子：多个命令被链接在一起，其中一个命令的输出端将连接到命令行中下一个命令的输入端。
+ *
+ * 可以在运行时通过添加或者移除{@link ChannelPipeline}中的{@link ChannelHandler}来实现动态添加和去除某些功能。
+ * 比如在 STARTTLS 协议被请求时，可以简单地通过向 ChannelPipeline 添加一个适当的 ChannelHandler（SslHandler）来按需地支持 STARTTLS 协议。
  */
-public interface ChannelPipeline
-        extends ChannelInboundInvoker, ChannelOutboundInvoker, Iterable<Entry<String, ChannelHandler>> {
+public interface ChannelPipeline extends ChannelInboundInvoker, ChannelOutboundInvoker, Iterable<Entry<String, ChannelHandler>> {
 
     /**
      * Inserts a {@link ChannelHandler} at the first position of this pipeline.

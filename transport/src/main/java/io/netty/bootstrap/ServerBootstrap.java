@@ -41,6 +41,11 @@ import java.util.concurrent.TimeUnit;
 /**
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
  *
+ * 用于服务器。
+ * 一个 ServerBootstrap 则需要两个EventLoopGroup。(实际上，ServerBootstrap 类也可以只使用一个 EventLoopGroup，此时其将在两个场景下共用同一个 EventLoopGroup)
+ * 因为服务器需要两组不同的 Channel。第一组将只包含一个 ServerChannel，代表服务
+ * 器自身的已绑定到某个本地端口的正在监听的套接字。而第二组将包含所有已创建的用来处理传
+ * 入客户端连接（对于每个服务器已经接受的连接都有一个）的 Channel。
  */
 public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerChannel> {
 

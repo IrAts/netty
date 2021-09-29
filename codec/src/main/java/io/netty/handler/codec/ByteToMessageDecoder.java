@@ -76,6 +76,12 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
     /**
      * Cumulate {@link ByteBuf}s by merge them into one {@link ByteBuf}'s, using memory copies.
+     * 在内存中将{@link ByteBuf}合并为一个{@link ByteBuf}用以累积。会发生内存只不过{@link ByteBuf}块的复制行为，适用于小数据量情况。
+     *
+     * 如果 cumulation 是空的并且 (ByteBuf)in 是由单个内存区域保存的，则直接返回 in 的引用即可。(ByteBuf有可能是由符合缓冲区组成，即链表状的多个内存块)
+     * 否则判断 cumulation 剩余空间能否将 in 写入，如果能的话就直接将 in 写入到 cumulation 然后返回 cumulation。
+     * 如果 cumulation 剩余空间不能将 in 写入，那么调用并返回 expandCumulation(alloc, cumulation, in)。
+     * 除了直接返回 (ByteBuf)in 外，其他情况都将会释放掉 (ByteBuf)in。
      */
     public static final Cumulator MERGE_CUMULATOR = new Cumulator() {
         @Override
@@ -111,6 +117,10 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      * Cumulate {@link ByteBuf}s by add them to a {@link CompositeByteBuf} and so do no memory copy whenever possible.
      * Be aware that {@link CompositeByteBuf} use a more complex indexing implementation so depending on your use-case
      * and the decoder implementation this may be slower then just use the {@link #MERGE_CUMULATOR}.
+     * 通过将{@link ByteBuf}添加到{@link CompositeByteBuf}来累积{@link ByteBuf}，因此尽可能不要复制内存（适用于数据量大的情况）。
+     * 应注意：{@link CompositeByteBuf}使用了更复杂的索引实现，因此根据你的用例和解码器实现，这可能比使用{@link #MERGE_CUMULATOR}要慢。
+     *
+     * 由于该累积器会将 (ByteBuf)in 和 cumulation 通过使用索引拼接起来。所以in不会被释放(除了拼接异常)。
      */
     public static final Cumulator COMPOSITE_CUMULATOR = new Cumulator() {
         @Override
@@ -153,12 +163,19 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
 
     ByteBuf cumulation;
     private Cumulator cumulator = MERGE_CUMULATOR;
+    /**
+     * 当该标志位 true 时，每次解码都将只会解码出一条消息。(实质上一次读取的数据里可能会解码出多条数据，这种情况下也仅仅解码出第一条数据)
+     */
     private boolean singleDecode;
+    /**
+     * 当前接收到的数据是否是第一条，也即当前接收导数据的时候，{@link #cumulation} 是否为null。(也就是还没有积累过任何数据)
+     */
     private boolean first;
 
     /**
      * This flag is used to determine if we need to call {@link ChannelHandlerContext#read()} to consume more data
      * when {@link ChannelConfig#isAutoRead()} is {@code false}.
+     * 该标志用于确定当{@link ChannelHandlerContext#read()}为{@code false}时，是否需要调用{@link ChannelHandlerContext#read()}来消耗更多数据。
      */
     private boolean firedChannelRead;
 
@@ -169,9 +186,16 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
      *     <li>{@link #STATE_CALLING_CHILD_DECODE}</li>
      *     <li>{@link #STATE_HANDLER_REMOVED_PENDING}</li>
      * </ul>
+     * 状态位
      */
     private byte decodeState = STATE_INIT;
+    /**
+     * 指定最多读取次数，当到达该值时当前消息还未读取完成，将调用 cumulation 的 {@link ByteBuf#discardSomeReadBytes()} 方法处理已经读取的数据。
+     */
     private int discardAfterReads = 16;
+    /**
+     * 已读取的次数，与 discardAfterReads 配合使用。
+     */
     private int numReads;
 
     protected ByteToMessageDecoder() {
@@ -271,8 +295,7 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
             CodecOutputList out = CodecOutputList.newInstance();
             try {
                 first = cumulation == null;
-                cumulation = cumulator.cumulate(ctx.alloc(),
-                        first ? Unpooled.EMPTY_BUFFER : cumulation, (ByteBuf) msg);
+                cumulation = cumulator.cumulate(ctx.alloc(), first ? Unpooled.EMPTY_BUFFER : cumulation, (ByteBuf) msg);
                 callDecode(ctx, cumulation, out);
             } catch (DecoderException e) {
                 throw e;
@@ -540,8 +563,8 @@ public abstract class ByteToMessageDecoder extends ChannelInboundHandlerAdapter 
         try {
             // This avoids redundant checks and stack depth compared to calling writeBytes(...)
             newCumulation.setBytes(0, oldCumulation, oldCumulation.readerIndex(), oldBytes)
-                .setBytes(oldBytes, in, in.readerIndex(), newBytes)
-                .writerIndex(totalBytes);
+                    .setBytes(oldBytes, in, in.readerIndex(), newBytes)
+                    .writerIndex(totalBytes);
             in.readerIndex(in.writerIndex());
             toRelease = oldCumulation;
             return newCumulation;

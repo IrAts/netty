@@ -73,6 +73,18 @@ import java.net.SocketAddress;
  * It is important to call {@link #close()} or {@link #close(ChannelPromise)} to release all
  * resources once you are done with the {@link Channel}. This ensures all resources are
  * released in a proper way, i.e. filehandles.
+ *
+ * Channel，EventLoop和ChannelFuture可以被认为是Netty网络抽象的代表。
+ *      Channel -> Socket
+ *      EventLop -> 控制流，多线程处理，并发
+ *      ChannelFuture -> 异步通知
+ *
+ * Channel 被创建时，会生成一个专属于自己的 ChannelPipeLine。TODO 具体是在什么时候为 Channel 生成 ChannelPipeLine 呢?
+ *      ChannelInitializer的实现被注册到了ServerBootstrap中。
+ *      当 ChannelInitializer.initChannel()方法被调用时，ChannelInitializer 将在 ChannelPipeline 中安装一组自定义的 ChannelHandler。
+ *      接着 ChannelInitializer 将它自己从 ChannelPipeline 中移除。
+ *
+ * 每个Channel都是唯一的，为了保证顺序而继承{@link Comparable}接口。若两个不同的 Channel 返回了相同的散列码，则该实现的{@link Comparable#compareTo(Object)}就会报错。
  */
 public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparable<Channel> {
 
@@ -111,6 +123,10 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
 
     /**
      * Return {@code true} if the {@link Channel} is active and so connected.
+     * 如果 Channel 是活动的，则返回 true 。
+     *
+     * 活动的意义可能依赖于底层的传输。例如，一个 Socket 传输一旦连接到
+     * 了远程节点便是活动的，而一个 Datagram 传输一旦被打开便是活动的。
      */
     boolean isActive();
 
