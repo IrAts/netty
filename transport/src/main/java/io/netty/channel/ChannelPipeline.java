@@ -224,6 +224,8 @@ import java.util.NoSuchElementException;
  *
  * 可以在运行时通过添加或者移除{@link ChannelPipeline}中的{@link ChannelHandler}来实现动态添加和去除某些功能。
  * 比如在 STARTTLS 协议被请求时，可以简单地通过向 ChannelPipeline 添加一个适当的 ChannelHandler（SslHandler）来按需地支持 STARTTLS 协议。
+ *
+ *
  */
 public interface ChannelPipeline extends ChannelInboundInvoker, ChannelOutboundInvoker, Iterable<Entry<String, ChannelHandler>> {
 

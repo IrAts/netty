@@ -110,6 +110,8 @@ public abstract class SimpleChannelInboundHandler<I> extends ChannelInboundHandl
 
     /**
      * Is called for each message of type {@link I}.
+     * 本方法在完成时{@link I}将会被自动释放.
+     * 所以不应该存储指向任何消息的引用供将来使用，因为这些引用都将会失效。
      *
      * @param ctx           the {@link ChannelHandlerContext} which this {@link SimpleChannelInboundHandler}
      *                      belongs to

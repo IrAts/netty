@@ -85,6 +85,14 @@ import java.net.SocketAddress;
  *      接着 ChannelInitializer 将它自己从 ChannelPipeline 中移除。
  *
  * 每个Channel都是唯一的，为了保证顺序而继承{@link Comparable}接口。若两个不同的 Channel 返回了相同的散列码，则该实现的{@link Comparable#compareTo(Object)}就会报错。
+ *
+ * 一个Channel的普通生命周期状态：
+ *      {@link ChannelHandlerMask#MASK_CHANNEL_UNREGISTERED} Channel 已经被创建，但还未注册到 EventLoop
+ *      {@link ChannelHandlerMask#MASK_CHANNEL_REGISTERED}   Channel 已经被注册到了 EventLoop
+ *      {@link ChannelHandlerMask#MASK_CHANNEL_ACTIVE}       Channel 已经连接到它的远程节点，现在可以收发数据
+ *      {@link ChannelHandlerMask#MASK_CHANNEL_INACTIVE}     Channel 没有连接到远程节点
+ *
+ *
  */
 public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparable<Channel> {
 

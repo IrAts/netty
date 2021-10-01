@@ -28,6 +28,10 @@ package io.netty.util;
  * {@link ReferenceCounted}, the contained objects will also be released via {@link #release()} when the container's
  * reference count becomes 0.
  * </p>
+ * Netty 在第 4 版中为 ByteBuf 和 ByteBufHolder 引入了用计数技术，它们都实现了 interface ReferenceCounted。
+ * 一个特定的{@link ReferenceCounted}实现类，可以用它自己的独特方式来定义它
+ * 的引用计数规则。例如，我们可以设想一个类，其 release()方法的实现总是将引用计数设为
+ * 零， 而不用关心它的当前值，从而一次性地使所有的活动引用都失效。
  */
 public interface ReferenceCounted {
     /**

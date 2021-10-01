@@ -20,9 +20,11 @@ public interface ChannelInboundInvoker {
     /**
      * A {@link Channel} was registered to its {@link EventLoop}.
      *
-     * This will result in having the  {@link ChannelInboundHandler#channelRegistered(ChannelHandlerContext)} method
+     * This will result in having the {@link ChannelInboundHandler#channelRegistered(ChannelHandlerContext)} method
      * called of the next  {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelRegistered(ChannelHandlerContext)方法。
      */
     ChannelInboundInvoker fireChannelRegistered();
 
@@ -32,6 +34,8 @@ public interface ChannelInboundInvoker {
      * This will result in having the  {@link ChannelInboundHandler#channelUnregistered(ChannelHandlerContext)} method
      * called of the next  {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelUnregistered(ChannelHandlerContext)方法
      */
     ChannelInboundInvoker fireChannelUnregistered();
 
@@ -41,6 +45,8 @@ public interface ChannelInboundInvoker {
      * This will result in having the  {@link ChannelInboundHandler#channelActive(ChannelHandlerContext)} method
      * called of the next  {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelActive(ChannelHandlerContext)方法。
      */
     ChannelInboundInvoker fireChannelActive();
 
@@ -50,6 +56,8 @@ public interface ChannelInboundInvoker {
      * This will result in having the  {@link ChannelInboundHandler#channelInactive(ChannelHandlerContext)} method
      * called of the next  {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelInactive(ChannelHandlerContext)方法。
      */
     ChannelInboundInvoker fireChannelInactive();
 
@@ -59,6 +67,8 @@ public interface ChannelInboundInvoker {
      * This will result in having the  {@link ChannelInboundHandler#exceptionCaught(ChannelHandlerContext, Throwable)}
      * method  called of the next  {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 exceptionCaught(ChannelHandlerContext, Throwable)方法。
      */
     ChannelInboundInvoker fireExceptionCaught(Throwable cause);
 
@@ -68,6 +78,8 @@ public interface ChannelInboundInvoker {
      * This will result in having the  {@link ChannelInboundHandler#userEventTriggered(ChannelHandlerContext, Object)}
      * method  called of the next  {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 userEventTriggered(ChannelHandlerContext, Object)方法。
      */
     ChannelInboundInvoker fireUserEventTriggered(Object event);
 
@@ -77,18 +89,24 @@ public interface ChannelInboundInvoker {
      * This will result in having the {@link ChannelInboundHandler#channelRead(ChannelHandlerContext, Object)}
      * method  called of the next {@link ChannelInboundHandler} contained in the  {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelRead(ChannelHandlerContext, Object msg)方法。
      */
     ChannelInboundInvoker fireChannelRead(Object msg);
 
     /**
      * Triggers an {@link ChannelInboundHandler#channelReadComplete(ChannelHandlerContext)}
      * event to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelReadComplete(ChannelHandlerContext)方法。
      */
     ChannelInboundInvoker fireChannelReadComplete();
 
     /**
      * Triggers an {@link ChannelInboundHandler#channelWritabilityChanged(ChannelHandlerContext)}
      * event to the next {@link ChannelInboundHandler} in the {@link ChannelPipeline}.
+     * <p>
+     * 调用 ChannelPipeline 中下一个 ChannelInboundHandler 的 channelWritabilityChanged(ChannelHandlerContext)方法。
      */
     ChannelInboundInvoker fireChannelWritabilityChanged();
 }

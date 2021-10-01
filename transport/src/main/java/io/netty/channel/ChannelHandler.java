@@ -184,6 +184,12 @@ import java.lang.annotation.Target;
  *                      |<- ChannelPipeline ->|
  *                     头部                   尾部
  *
+ * {@link  ChannelHandler}中定义了一些生命周期操作：
+ *   handlerAdded   | 当把 ChannelHandler 添加到 ChannelPipeline 中时被调用
+ *   handlerRemoved | 当从 ChannelPipeline 中移除 ChannelHandler 时被调用
+ *   exceptionCaught| 当处理过程中在 ChannelPipeline 中有错误产生时被调用
+ *
+ *
  */
 public interface ChannelHandler {
 

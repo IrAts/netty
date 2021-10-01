@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * The result of an asynchronous {@link Channel} I/O operation.
+ * 异步{@link Channel} I/O操作的结果。
  * <p>
  * All I/O operations in Netty are asynchronous.  It means any I/O calls will
  * return immediately with no guarantee that the requested I/O operation has

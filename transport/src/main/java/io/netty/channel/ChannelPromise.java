@@ -21,6 +21,27 @@ import io.netty.util.concurrent.Promise;
 
 /**
  * Special {@link ChannelFuture} which is writable.
+ *
+ * {@link ChannelFuture}对于持有方而言是一个票据，一个不可变对象,
+ * 也即当{@link ChannelFuture}一旦完成，那么结果将不会改变。
+ *
+ * 所以在设计{@link ChannelFuture}时，就应该设计为不可变对象。
+ * 但事实上{@link ChannelFuture}创建出来的时候并非完整态，其需要
+ * 等待实际的异步操作完成并设置相关的值，只有当{@link ChannelFuture}
+ * 完成后才应该是不可变对象。
+ *
+ * 为了给持有方保留{@link ChannelFuture}为不可变对象的视觉，
+ * {@link ChannelFuture}的接口被设计为不可变。
+ * 而为了让一部操作能够设置{@link ChannelFuture}的状态，派生
+ * 出子类{@link ChannelPromise}来进行状态设置，所以实际上在
+ * Netty 内部传递的时候使用的是{@link ChannelPromise}，因为
+ * Netty 内部需要修改{@link ChannelFuture}的状态。
+ *
+ * 到此，我们不难理解{@link ChannelPromise}为何增添以下方法：
+ *  {@link ChannelPromise#setSuccess()}
+ *  {@link ChannelPromise#trySuccess()}
+ *  {@link ChannelPromise#unvoid()}
+ *
  */
 public interface ChannelPromise extends ChannelFuture, Promise<Void> {
 

@@ -39,6 +39,18 @@ import static io.netty.util.internal.StringUtil.EMPTY_STRING;
 import static io.netty.util.internal.StringUtil.NEWLINE;
 import static io.netty.util.internal.StringUtil.simpleClassName;
 
+/**
+ * 为了帮助你诊断潜在的（资源泄漏）问题， Netty提供了{@link ResourceLeakDetector}
+ * 级别，它将对你应用程序的缓冲区分配做大约 1% 的采样来检测内存泄露。相关的开销是非常小的。
+ *
+ * Netty 目前定义了四种泄漏检测级别：
+ *      {@link Level#DISABLED}  禁用泄漏检测。只有在详尽的测试之后才应设置为这个值
+ *      {@link Level#SIMPLE}    使用 1%的默认采样率检测并报告任何发现的泄露。这是默认级别，适合绝大部分的情况
+ *      {@link Level#ADVANCED}  使用默认的采样率，报告所发现的任何的泄露以及对应的消息被访问的位置
+ *      {@link Level#PARANOID}  类似于 ADVANCED，但是其将会对每次（对消息的）访问都进行采样。这对性能将会有很大的影响，应该只在调试阶段使用
+ * 泄露检测级别可以通过将下面的 Java 系统属性设置为表中的一个值来定义：
+ *      java -Dio.netty.leakDetectionLevel=ADVANCED
+ */
 public class ResourceLeakDetector<T> {
 
     private static final String PROP_LEVEL_OLD = "io.netty.leakDetectionLevel";

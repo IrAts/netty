@@ -31,6 +31,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#bind(ChannelHandlerContext, SocketAddress, ChannelPromise)} method
      * called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 绑定到一个本地地址，这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 bind(ChannelHandlerContext, SocketAddress, ChannelPromise)方法。
      */
     ChannelFuture bind(SocketAddress localAddress);
 
@@ -46,6 +49,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#connect(ChannelHandlerContext, SocketAddress, SocketAddress, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 连接到一个远程地址，这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 connect(ChannelHandlerContext, SocketAddress, ChannelPromise)方法。
      */
     ChannelFuture connect(SocketAddress remoteAddress);
 
@@ -58,6 +64,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#connect(ChannelHandlerContext, SocketAddress, SocketAddress, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 连接到一个远程地址，这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 connect(ChannelHandlerContext, SocketAddress, ChannelPromise)方法。
      */
     ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress);
 
@@ -69,6 +78,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#disconnect(ChannelHandlerContext, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将Channel 断开连接。这将调用ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 disconnect(ChannelHandlerContext, Channel Promise)方法
      */
     ChannelFuture disconnect();
 
@@ -83,6 +95,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#close(ChannelHandlerContext, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 关闭。这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 close(ChannelHandlerContext, ChannelPromise)方法。
      */
     ChannelFuture close();
 
@@ -95,7 +110,10 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#deregister(ChannelHandlerContext, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
-     *
+     * <p>
+     * 将 Channel 从它先前所分配的 EventExecutor（即 EventLoop）中注销。这将调
+     * 用 ChannelPipeline 中的下一个 ChannelOutboundHandler 的 deregister
+     * (ChannelHandlerContext, ChannelPromise)方法。
      */
     ChannelFuture deregister();
 
@@ -127,6 +145,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#connect(ChannelHandlerContext, SocketAddress, SocketAddress, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 连接到一个远程地址，这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 connect(ChannelHandlerContext, SocketAddress, ChannelPromise)方法。
      */
     ChannelFuture connect(SocketAddress remoteAddress, ChannelPromise promise);
 
@@ -141,6 +162,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#connect(ChannelHandlerContext, SocketAddress, SocketAddress, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 连接到一个远程地址，这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 connect(ChannelHandlerContext, SocketAddress, ChannelPromise)方法。
      */
     ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise);
 
@@ -154,6 +178,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#disconnect(ChannelHandlerContext, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将Channel 断开连接。这将调用ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 disconnect(ChannelHandlerContext, Channel Promise)方法
      */
     ChannelFuture disconnect(ChannelPromise promise);
 
@@ -169,6 +196,9 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#close(ChannelHandlerContext, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 关闭。这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler 的 close(ChannelHandlerContext, ChannelPromise)方法。
      */
     ChannelFuture close(ChannelPromise promise);
 
@@ -183,6 +213,10 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#deregister(ChannelHandlerContext, ChannelPromise)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 将 Channel 从它先前所分配的 EventExecutor（即 EventLoop）中注销。这将调
+     * 用 ChannelPipeline 中的下一个 ChannelOutboundHandler 的 deregister
+     * (ChannelHandlerContext, ChannelPromise)方法。
      */
     ChannelFuture deregister(ChannelPromise promise);
 
@@ -197,6 +231,14 @@ public interface ChannelOutboundInvoker {
      * {@link ChannelOutboundHandler#read(ChannelHandlerContext)}
      * method called of the next {@link ChannelOutboundHandler} contained in the {@link ChannelPipeline} of the
      * {@link Channel}.
+     * <p>
+     * 请求从{@link Channel}读取数据到第一个入站缓冲区，如果读取到数据则触发一个
+     * {@link ChannelInboundHandler#channelRead(ChannelHandlerContext, Object)}事件，
+     * 并触发一个{@link ChannelInboundHandler#channelReadComplete(ChannelHandlerContext) channelReadComplete}事件，
+     * 以便处理程序可以决定继续读取。如果调用该方法时已经有一个挂起的读操作，这个方法什么也不做。
+     * <p>
+     * 这将导致在{@link Channel}的{@link ChannelPipeline}中的下一个{@link ChannelOutboundHandler}的
+     * {{@link ChannelOutboundHandler#read(ChannelHandlerContext)}方法被调用。
      */
     ChannelOutboundInvoker read();
 
@@ -204,6 +246,11 @@ public interface ChannelOutboundInvoker {
      * Request to write a message via this {@link ChannelHandlerContext} through the {@link ChannelPipeline}.
      * This method will not request to actual flush, so be sure to call {@link #flush()}
      * once you want to request to flush all pending data to the actual transport.
+     * <p>
+     * 将消息写入 Channel。这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler的write(ChannelHandlerContext, Object msg, ChannelPromise)方法。
+     * 注意：这并不会将消息写入底层的 Socket，而只会将它放入队列中。
+     * 要将它写入 Socket，需要调用 flush()或者 writeAndFlush()方法
      */
     ChannelFuture write(Object msg);
 
@@ -211,21 +258,33 @@ public interface ChannelOutboundInvoker {
      * Request to write a message via this {@link ChannelHandlerContext} through the {@link ChannelPipeline}.
      * This method will not request to actual flush, so be sure to call {@link #flush()}
      * once you want to request to flush all pending data to the actual transport.
+     * <p>
+     * 将消息写入 Channel。这将调用 ChannelPipeline 中的下一个
+     * ChannelOutboundHandler的write(ChannelHandlerContext, Object msg, ChannelPromise)方法。
+     * 注意：这并不会将消息写入底层的 Socket，而只会将它放入队列中。
+     * 要将它写入 Socket，需要调用 flush()或者 writeAndFlush()方法
      */
     ChannelFuture write(Object msg, ChannelPromise promise);
 
     /**
      * Request to flush all pending messages via this ChannelOutboundInvoker.
+     * <p>
+     * 冲刷Channel所有挂起的写入。这将调用ChannelPipeline中的下一个
+     * ChannelOutboundHandler 的 flush(ChannelHandlerContext)方法。
      */
     ChannelOutboundInvoker flush();
 
     /**
      * Shortcut for call {@link #write(Object, ChannelPromise)} and {@link #flush()}.
+     * <p>
+     * 这是一个先调用 write()方法再接着调用 flush()方法的便利方法。
      */
     ChannelFuture writeAndFlush(Object msg, ChannelPromise promise);
 
     /**
      * Shortcut for call {@link #write(Object)} and {@link #flush()}.
+     * <p>
+     * 这是一个先调用 write()方法再接着调用 flush()方法的便利方法。
      */
     ChannelFuture writeAndFlush(Object msg);
 

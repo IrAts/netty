@@ -16,8 +16,14 @@
 package io.netty.buffer;
 
 /**
- * Implementations are responsible to allocate buffers. Implementations of this interface are expected to be
- * thread-safe.
+ * Implementations are responsible to allocate buffers.
+ * Implementations of this interface are expected to be thread-safe.
+ * 实现负责分配缓冲区,这个接口的实现应该是线程安全的。
+ *
+ * Netty提供了两种ByteBufAllocator的实现：PooledByteBufAllocator和UnpooledByteBufAllocator。
+ * 前者池化了ByteBuf的实例以提高性能并最大限度地减少内存碎片，使用了一种称为jemalloc的已被大量现代操作系统所采用的高效方法来分配内存。
+ * 后者的实现不池化ByteBuf实例， 并且在每次它被调用时都会返回一个新的实例。
+ *
  */
 public interface ByteBufAllocator {
 
@@ -26,12 +32,16 @@ public interface ByteBufAllocator {
     /**
      * Allocate a {@link ByteBuf}. If it is a direct or heap buffer
      * depends on the actual implementation.
+     *
+     * 返回一个基于堆或者直接内存存储的{@link ByteBuf}，返回何种类型看具体实现。
      */
     ByteBuf buffer();
 
     /**
      * Allocate a {@link ByteBuf} with the given initial capacity.
      * If it is a direct or heap buffer depends on the actual implementation.
+     *
+     * 返回一个基于堆或者直接内存存储的{@link ByteBuf}，返回何种类型看具体实现。
      */
     ByteBuf buffer(int initialCapacity);
 
@@ -39,53 +49,64 @@ public interface ByteBufAllocator {
      * Allocate a {@link ByteBuf} with the given initial capacity and the given
      * maximal capacity. If it is a direct or heap buffer depends on the actual
      * implementation.
+     *
+     * 返回一个基于堆或者直接内存存储的{@link ByteBuf}，返回何种类型看具体实现。
      */
     ByteBuf buffer(int initialCapacity, int maxCapacity);
 
     /**
      * Allocate a {@link ByteBuf}, preferably a direct buffer which is suitable for I/O.
+     * 分配一个{@link ByteBuf}，最好是一个适合I/O的直接缓冲区。
      */
     ByteBuf ioBuffer();
 
     /**
      * Allocate a {@link ByteBuf}, preferably a direct buffer which is suitable for I/O.
+     * 分配一个{@link ByteBuf}，最好是一个适合I/O的直接缓冲区。
      */
     ByteBuf ioBuffer(int initialCapacity);
 
     /**
      * Allocate a {@link ByteBuf}, preferably a direct buffer which is suitable for I/O.
+     * 分配一个{@link ByteBuf}，最好是一个适合I/O的直接缓冲区。
      */
     ByteBuf ioBuffer(int initialCapacity, int maxCapacity);
 
     /**
      * Allocate a heap {@link ByteBuf}.
+     * 分配基于堆存储的{@link ByteBuf}.
      */
     ByteBuf heapBuffer();
 
     /**
      * Allocate a heap {@link ByteBuf} with the given initial capacity.
+     * 分配基于堆存储的{@link ByteBuf}.
      */
     ByteBuf heapBuffer(int initialCapacity);
 
     /**
      * Allocate a heap {@link ByteBuf} with the given initial capacity and the given
      * maximal capacity.
+     * 分配基于堆存储的{@link ByteBuf}.
      */
     ByteBuf heapBuffer(int initialCapacity, int maxCapacity);
 
     /**
      * Allocate a direct {@link ByteBuf}.
+     * 分配基于直接内存存储的{@link ByteBuf}.
      */
     ByteBuf directBuffer();
 
     /**
      * Allocate a direct {@link ByteBuf} with the given initial capacity.
+     * 分配基于直接内存存储的{@link ByteBuf}.
      */
     ByteBuf directBuffer(int initialCapacity);
 
     /**
      * Allocate a direct {@link ByteBuf} with the given initial capacity and the given
      * maximal capacity.
+     * 分配基于直接内存存储的{@link ByteBuf}.
      */
     ByteBuf directBuffer(int initialCapacity, int maxCapacity);
 
