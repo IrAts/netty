@@ -250,7 +250,12 @@ public interface ChannelOutboundInvoker {
      * 将消息写入 Channel。这将调用 ChannelPipeline 中的下一个
      * ChannelOutboundHandler的write(ChannelHandlerContext, Object msg, ChannelPromise)方法。
      * 注意：这并不会将消息写入底层的 Socket，而只会将它放入队列中。
-     * 要将它写入 Socket，需要调用 flush()或者 writeAndFlush()方法
+     * 要将它写入 Socket，需要调用 flush()或者 writeAndFlush()方法。
+     * <p>
+     * 对于一个write操作，会将msg写入到对应的Channel，而每个Channel都由一个EventLoop负责处理IO事件。
+     * 当执行write操作时，会判断调用write操作的线程是否为该Channel对应的EventLoop的支撑线程(每个EventLoop永久关联一个线程)。
+     * 如果调用write操作的线程不是该Channel对应的EventLoop的支撑线程，就会将msg包装为一个写事件的Task提交给EventLoop执行。
+     * 否则直接让当前线程执行。
      */
     ChannelFuture write(Object msg);
 
@@ -263,6 +268,11 @@ public interface ChannelOutboundInvoker {
      * ChannelOutboundHandler的write(ChannelHandlerContext, Object msg, ChannelPromise)方法。
      * 注意：这并不会将消息写入底层的 Socket，而只会将它放入队列中。
      * 要将它写入 Socket，需要调用 flush()或者 writeAndFlush()方法
+     * <p>
+     * 对于一个write操作，会将msg写入到对应的Channel，而每个Channel都由一个EventLoop负责处理IO事件。
+     * 当执行write操作时，会判断调用write操作的线程是否为该Channel对应的EventLoop的支撑线程(每个EventLoop永久关联一个线程)。
+     * 如果调用write操作的线程不是该Channel对应的EventLoop的支撑线程，就会将msg包装为一个写事件的Task提交给EventLoop执行。
+     * 否则直接让当前线程执行。
      */
     ChannelFuture write(Object msg, ChannelPromise promise);
 
@@ -278,6 +288,11 @@ public interface ChannelOutboundInvoker {
      * Shortcut for call {@link #write(Object, ChannelPromise)} and {@link #flush()}.
      * <p>
      * 这是一个先调用 write()方法再接着调用 flush()方法的便利方法。
+     * <p>
+     * 对于一个write操作，会将msg写入到对应的Channel，而每个Channel都由一个EventLoop负责处理IO事件。
+     * 当执行write操作时，会判断调用write操作的线程是否为该Channel对应的EventLoop的支撑线程(每个EventLoop永久关联一个线程)。
+     * 如果调用write操作的线程不是该Channel对应的EventLoop的支撑线程，就会将msg包装为一个写事件的Task提交给EventLoop执行。
+     * 否则直接让当前线程执行。
      */
     ChannelFuture writeAndFlush(Object msg, ChannelPromise promise);
 
@@ -285,6 +300,11 @@ public interface ChannelOutboundInvoker {
      * Shortcut for call {@link #write(Object)} and {@link #flush()}.
      * <p>
      * 这是一个先调用 write()方法再接着调用 flush()方法的便利方法。
+     * <p>
+     * 对于一个write操作，会将msg写入到对应的Channel，而每个Channel都由一个EventLoop负责处理IO事件。
+     * 当执行write操作时，会判断调用write操作的线程是否为该Channel对应的EventLoop的支撑线程(每个EventLoop永久关联一个线程)。
+     * 如果调用write操作的线程不是该Channel对应的EventLoop的支撑线程，就会将msg包装为一个写事件的Task提交给EventLoop执行。
+     * 否则直接让当前线程执行。
      */
     ChannelFuture writeAndFlush(Object msg);
 

@@ -26,13 +26,17 @@ import io.netty.util.concurrent.EventExecutor;
  * Enables a {@link ChannelHandler} to interact with its {@link ChannelPipeline}
  * and other handlers. Among other things a handler can notify the next {@link ChannelHandler} in the
  * {@link ChannelPipeline} as well as modify the {@link ChannelPipeline} it belongs to dynamically.
+ * 使一个{@link ChannelHandler}与它的{@link ChannelPipeline}和其他 handler 交互。
+ * 除此之外，handler 还可以通知{@link ChannelPipeline}中的下一个{@link ChannelHandler}，并动态修改它所属的{@link ChannelPipeline}。
  *
  * <h3>Notify</h3>
  *
  * You can notify the closest handler in the same {@link ChannelPipeline} by calling one of the various methods
  * provided here.
+ * 你可以通过调用这里提供的各种方法之一来通知同一个{@link ChannelPipeline}中最接近的 handler。
  *
  * Please refer to {@link ChannelPipeline} to understand how an event flows.
+ * 请参考{@link ChannelPipeline}了解事件如何流动。
  *
  * <h3>Modifying a pipeline</h3>
  *
@@ -112,6 +116,7 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
      * Return {@code true} if the {@link ChannelHandler} which belongs to this context was removed
      * from the {@link ChannelPipeline}. Note that this method is only meant to be called from with in the
      * {@link EventLoop}.
+     * 如果所关联的 ChannelHandler 已经被从 ChannelPipeline 中移除则返回 true。
      */
     boolean isRemoved();
 
@@ -155,6 +160,7 @@ public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvok
 
     /**
      * Return the assigned {@link ByteBufAllocator} which will be used to allocate {@link ByteBuf}s.
+     * 返回和这个实例相关联的Channel 所配置的 ByteBufAllocator。
      */
     ByteBufAllocator alloc();
 

@@ -85,6 +85,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * The {@link EventLoopGroup} which is used to handle all the events for the to-be-created
      * {@link Channel}
+     * 设置用于处理 Channel 所有事件的 EventLoopGroup。
      */
     public B group(EventLoopGroup group) {
         ObjectUtil.checkNotNull(group, "group");
@@ -104,6 +105,8 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * The {@link Class} which is used to create {@link Channel} instances from.
      * You either use this or {@link #channelFactory(io.netty.channel.ChannelFactory)} if your
      * {@link Channel} implementation has no no-args constructor.
+     * channel()方法指定了Channel的实现类。如果该实现类没提供默认的构造函数，
+     * 可以通过调用channelFactory()方法来指定一个工厂类。
      */
     public B channel(Class<? extends C> channelClass) {
         return channelFactory(new ReflectiveChannelFactory<C>(
@@ -131,6 +134,10 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
      * is not working for you because of some more complex needs. If your {@link Channel} implementation
      * has a no-args constructor, its highly recommend to just use {@link #channel(Class)} to
      * simplify your code.
+     * <p>
+     * 当调用{@link #bind()}时将会使用{@link io.netty.channel.ChannelFactory}来创建一个{@link Channel}实例。
+     * 这个方法仅会在{@link #channel(Class)}不能满足一些复杂需求时调用。如果你的{@link Channel}实现了无参构造器，
+     * 强烈建议使用{@link #channel(Class)}来简化代码。
      */
     @SuppressWarnings({ "unchecked", "deprecation" })
     public B channelFactory(io.netty.channel.ChannelFactory<? extends C> channelFactory) {

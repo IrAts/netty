@@ -58,6 +58,15 @@ public interface ChannelInboundHandler extends ChannelHandler {
      * attempt to read an inbound data from the current {@link Channel} will be made until
      * {@link ChannelHandlerContext#read()} is called.
      * 当当前这条消息被{@link #channelRead(ChannelHandlerContext, Object)}读取完成时调用本方法。
+     * 当前消息被读取完成？？？？在脱离应用协议的情景下，我Netty怎么知道来自TCP中的数据流是否读取完成？
+     * 这个注释写得有问题，模糊不清的。
+     * 实际上，当前消息被读取完成指的是该次对传输层的read操作无法获取到任何数据，也就是以下两种情况：
+     *      1.对传输层的read()操作返回0
+     *      2.对传输层的read()操作返回了一个缓冲区，这个缓冲区里读取到的数据的长度>0并且<1024。(这里的1024应该是ByteBuf的默认最大长度)
+     * 还句话说，就是每次读事件发生时，Netty会持续读取传输层的数据，直到传输层的数据被读取完，那么就会调用本方法。
+     * 这样看来，他的注释好像也没问题。。。。
+     * 由于Netty在从传输层读取数据的时候，发送方可能在一直发送数据，又由于接收方的接受速率和发送方发送速率是不确定的。
+     * 所以也就是说，这个方法的调用时机也是不确定的，除非应用层协议加以严格限制发送方和接收方的交互。
      */
     void channelReadComplete(ChannelHandlerContext ctx) throws Exception;
 
