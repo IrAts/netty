@@ -84,6 +84,7 @@ public class Bootstrap extends AbstractBootstrap<Bootstrap, Channel> {
     /**
      * The {@link SocketAddress} to connect to once the {@link #connect()} method
      * is called.
+     * 设置远程地址。或者，也可以通过 connect()方法来指定它。
      */
     public Bootstrap remoteAddress(SocketAddress remoteAddress) {
         this.remoteAddress = remoteAddress;
@@ -108,6 +109,7 @@ public class Bootstrap extends AbstractBootstrap<Bootstrap, Channel> {
 
     /**
      * Connect a {@link Channel} to the remote peer.
+     * 连接到远程节点并返回一个 ChannelFuture，其将会在连接操作完成后接收到通知。
      */
     public ChannelFuture connect() {
         validate();

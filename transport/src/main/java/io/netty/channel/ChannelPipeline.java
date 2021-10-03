@@ -142,8 +142,10 @@ import java.util.NoSuchElementException;
  * <ul>
  * <li>3 and 4 don't implement {@link ChannelInboundHandler}, and therefore the actual evaluation order of an inbound
  *     event will be: 1, 2, and 5.</li>
+ * <li>3 和 4 没有实现 {@link ChannelInboundHandler}, 因此实际的入站执行顺序为：1->2->5 </li>
  * <li>1 and 2 don't implement {@link ChannelOutboundHandler}, and therefore the actual evaluation order of a
  *     outbound event will be: 5, 4, and 3.</li>
+ * <li>1 和 2 没有实现 {@link ChannelOutboundHandler}, 因此实际的出站执行顺序为：5->4->3 </li>
  * <li>If 5 implements both {@link ChannelInboundHandler} and {@link ChannelOutboundHandler}, the evaluation order of
  *     an inbound and a outbound event could be 125 and 543 respectively.</li>
  * </ul>
@@ -152,6 +154,8 @@ import java.util.NoSuchElementException;
  *
  * As you might noticed in the diagram shows, a handler has to invoke the event propagation methods in
  * {@link ChannelHandlerContext} to forward an event to its next handler.  Those methods include:
+ * <br/>
+ * 如果你注意图表的数据流动，一个 handler 执行{@link ChannelHandlerContext}的事件传播方法将事件推动到下一个 handler。这些方法包括：
  * <ul>
  * <li>Inbound event propagation methods:
  *     <ul>

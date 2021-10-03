@@ -42,10 +42,14 @@ import java.util.concurrent.TimeUnit;
  * {@link Bootstrap} sub-class which allows easy bootstrap of {@link ServerChannel}
  *
  * 用于服务器。
- * 一个 ServerBootstrap 则需要两个EventLoopGroup。(实际上，ServerBootstrap 类也可以只使用一个 EventLoopGroup，此时其将在两个场景下共用同一个 EventLoopGroup)
+ * 一个 ServerBootstrap 则需要两个EventLoopGroup。
+ * (实际上，ServerBootstrap 类也可以只使用一个 EventLoopGroup，此时其将在两个场景下共用同一个 EventLoopGroup)
  * 因为服务器需要两组不同的 Channel。第一组将只包含一个 ServerChannel，代表服务
  * 器自身的已绑定到某个本地端口的正在监听的套接字。而第二组将包含所有已创建的用来处理传
  * 入客户端连接（对于每个服务器已经接受的连接都有一个）的 Channel。
+ *
+ * 当调用{@link ServerBootstrap#bind()}方法时，会生成一个{@link ServerChannel}负责监听连接请求。
+ * 每个创建成功的连接都将被包装为一个{@link Channel}。
  */
 public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerChannel> {
 
@@ -73,6 +77,8 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
 
     /**
      * Specify the {@link EventLoopGroup} which is used for the parent (acceptor) and the child (client).
+     * 设置 ServerBootstrap 要用的 EventLoopGroup。
+     * 这个 EventLoopGroup 将同时用于 ServerChannel 和被接受的子 Channel 的IO处理。
      */
     @Override
     public ServerBootstrap group(EventLoopGroup group) {
@@ -83,6 +89,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      * Set the {@link EventLoopGroup} for the parent (acceptor) and the child (client). These
      * {@link EventLoopGroup}'s are used to handle all the events and IO for {@link ServerChannel} and
      * {@link Channel}'s.
+     * 设置 ServerBootstrap 要用的 EventLoopGroup。
+     * parentGroup 用于 ServerChannel 来接受连接并生成 Channel。
+     * childGroup 用于被接受的子 Channel 的IO处理。
      */
     public ServerBootstrap group(EventLoopGroup parentGroup, EventLoopGroup childGroup) {
         super.group(parentGroup);
@@ -97,6 +106,9 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
      * Allow to specify a {@link ChannelOption} which is used for the {@link Channel} instances once they get created
      * (after the acceptor accepted the {@link Channel}). Use a value of {@code null} to remove a previous set
      * {@link ChannelOption}.
+     * <p>
+     * 指定当子 Channel 被接受时， 应用到子 Channel 的 ChannelConfig 的
+     * ChannelOption。所支持的 ChannelOption 取决于所使用的 Channel 的类型。
      */
     public <T> ServerBootstrap childOption(ChannelOption<T> childOption, T value) {
         ObjectUtil.checkNotNull(childOption, "childOption");
@@ -113,6 +125,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
     /**
      * Set the specific {@link AttributeKey} with the given value on every child {@link Channel}. If the value is
      * {@code null} the {@link AttributeKey} is removed
+     * 将属性设置给已经被接受的子 Channel。
      */
     public <T> ServerBootstrap childAttr(AttributeKey<T> childKey, T value) {
         ObjectUtil.checkNotNull(childKey, "childKey");

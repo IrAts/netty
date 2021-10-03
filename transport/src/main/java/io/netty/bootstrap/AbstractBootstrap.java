@@ -146,6 +146,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * The {@link SocketAddress} which is used to bind the local "end" to.
+     * 指定 Channel 应该绑定到的本地地址。如果没有指定，
+     * 则将由操作系统创建一个随机的地址。或者，也可以通过
+     * bind()或者 connect()方法指定 localAddress。
      */
     public B localAddress(SocketAddress localAddress) {
         this.localAddress = localAddress;
@@ -176,6 +179,18 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * Allow to specify a {@link ChannelOption} which is used for the {@link Channel} instances once they got
      * created. Use a value of {@code null} to remove a previous set {@link ChannelOption}.
+     * <p>
+     * 对于{@link Bootstrap}而言：
+     * 设置 ChannelOption，其将被应用到新创建的 Channel 的 ChannelConfig。
+     * 这些选项将会通过 bind()或者 connect()方法设置到 Channel，不管哪个先被调用。
+     * 这个方法在 Channel 已经被创建后再调用将不会有任何的效果。
+     * 支持的 ChannelOption 取决于使用的 Channel 类型。
+     * <p>
+     * 对于{@link ServerBootstrap}而言：
+     * 指定要应用到新创建的 ServerChannel 的 ChannelConfig 的 ChannelOption。
+     * 这些选项将会通过 bind()方法设置到 Channel。在 bind()方法]被调用之后，
+     * 设置或者改变 ChannelOption 都不会有任何的效果。
+     * 支持的 ChannelOption 取决于所使用的 Channel 类型。
      */
     public <T> B option(ChannelOption<T> option, T value) {
         ObjectUtil.checkNotNull(option, "option");
@@ -192,6 +207,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     /**
      * Allow to specify an initial attribute of the newly created {@link Channel}.  If the {@code value} is
      * {@code null}, the attribute of the specified {@code key} is removed.
+     * <p>
+     * 指定新创建的 Channel 的初始化属性值。这些属性值是通过 bind()或者 connect()方法设置到 Channel 的，
+     * 具体取决于谁最先被调用。 这个方法在 Channel 被创建后将不会有任何的效果。
      */
     public <T> B attr(AttributeKey<T> key, T value) {
         ObjectUtil.checkNotNull(key, "key");
@@ -236,6 +254,9 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * Create a new {@link Channel} and bind it.
+     * 绑定 Channel 并返回一个 ChannelFuture，其将会在绑
+     * 定操作完成后接收到通知，在那之后必须调用 Channel.
+     * connect()方法来建立连接。
      */
     public ChannelFuture bind() {
         validate();
@@ -370,6 +391,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
 
     /**
      * the {@link ChannelHandler} to use for serving the requests.
+     * 设置将被添加到 ChannelPipeline 以接收事件通知的 ChannelHandler。
      */
     public B handler(ChannelHandler handler) {
         this.handler = ObjectUtil.checkNotNull(handler, "handler");
