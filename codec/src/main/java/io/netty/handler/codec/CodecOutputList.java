@@ -179,6 +179,7 @@ final class CodecOutputList extends AbstractList<Object> implements RandomAccess
 
     /**
      * Returns {@code true} if any elements where added or set. This will be reset once {@link #recycle()} was called.
+     * 如果添加或设置了任何元素，则返回{@code true}。一旦调用了{@link #recycle()}，这个函数将被重置。
      */
     boolean insertSinceRecycled() {
         return insertSinceRecycled;

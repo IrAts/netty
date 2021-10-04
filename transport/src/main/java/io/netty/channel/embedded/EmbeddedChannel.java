@@ -46,6 +46,15 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 
 /**
  * Base class for {@link Channel} implementations that are used in an embedded fashion.
+ *
+ *                      Head         Pipeline          Tail
+ *                       +———————————————————————————————+
+ * readOutbound(...) <-- | <----- OutBoundHandler <----- | <-- writeOutbound(...)
+ *                       |                               |
+ *                       |                               |
+ * writeInbound(...) --> | -----> InBoundHandler  -----> | --> readInbound(...)
+ *                       +———————————————————————————————+
+ *
  */
 public class EmbeddedChannel extends AbstractChannel {
 
@@ -303,6 +312,7 @@ public class EmbeddedChannel extends AbstractChannel {
 
     /**
      * Return received data from this {@link Channel}
+     * 从 EmbeddedChannel 的接受缓冲区中读取数据。
      */
     @SuppressWarnings("unchecked")
     public <T> T readInbound() {
@@ -315,6 +325,7 @@ public class EmbeddedChannel extends AbstractChannel {
 
     /**
      * Read data from the outbound. This may return {@code null} if nothing is readable.
+     * 从 EmbeddedChannel 的发送缓冲区中接受数据。
      */
     @SuppressWarnings("unchecked")
     public <T> T readOutbound() {
@@ -327,9 +338,20 @@ public class EmbeddedChannel extends AbstractChannel {
 
     /**
      * Write messages to the inbound of this {@link Channel}.
+     * 将消息写入到 EmbeddedChannel。
+     * 写入 EmbeddedChannel 的消息会沿着 Pipeline 流动到尾端。
+     * 如果写入的消息成功流动到 Pipeline 的尾端则返回ture。
+     * 即下图中的 readInbound() 能读取到数据则该方法返回true。
+     *
+     *                      Head         Pipeline          Tail
+     *                       +———————————————————————————————+
+     * readOutbound(...) <-- | <----- OutBoundHandler <----- | <-- writeOutbound(...)
+     *                       |                               |
+     *                       |                               |
+     * writeInbound(...) --> | -----> InBoundHandler  -----> | --> readInbound(...)
+     *                       +———————————————————————————————+
      *
      * @param msgs the messages to be written
-     *
      * @return {@code true} if the write operation did add something to the inbound buffer
      */
     public boolean writeInbound(Object... msgs) {
@@ -391,6 +413,18 @@ public class EmbeddedChannel extends AbstractChannel {
 
     /**
      * Write messages to the outbound of this {@link Channel}.
+     * 将消息写入到 EmbeddedChannel。
+     * 写入 EmbeddedChannel 的消息会沿着 Pipeline 流动到头部。
+     * 如果写入的消息成功流动到 Pipeline 的尾端则返回ture。
+     * 即下图中的 readOutbound() 能读取到数据则该方法返回true。
+     *
+     *                      Head         Pipeline          Tail
+     *                       +———————————————————————————————+
+     * readOutbound(...) <-- | <----- OutBoundHandler <----- | <-- writeOutbound(...)
+     *                       |                               |
+     *                       |                               |
+     * writeInbound(...) --> | -----> InBoundHandler  -----> | --> readInbound(...)
+     *                       +———————————————————————————————+
      *
      * @param msgs              the messages to be written
      * @return bufferReadable   returns {@code true} if the write operation did add something to the outbound buffer
@@ -476,6 +510,9 @@ public class EmbeddedChannel extends AbstractChannel {
 
     /**
      * Mark this {@link Channel} as finished. Any further try to write data to it will fail.
+     * 将 EmbeddedChannel 标记为完成，任何进一步向它写入数据的尝试都会失败。
+     * 并且如果有可被读取的入站数据或者出站数据，则返回 true。
+     * 这个方法还将会调用 EmbeddedChannel 上的 close()方法
      *
      * @return bufferReadable returns {@code true} if any of the used buffers has something left to read
      */
@@ -486,6 +523,7 @@ public class EmbeddedChannel extends AbstractChannel {
     /**
      * Mark this {@link Channel} as finished and release all pending message in the inbound and outbound buffer.
      * Any further try to write data to it will fail.
+     * 将 EmbeddedChannel 标记为完成，并且释放所有入站和出站的缓冲区，任何进一步向它写入数据的尝试都会失败。
      *
      * @return bufferReadable returns {@code true} if any of the used buffers has something left to read
      */

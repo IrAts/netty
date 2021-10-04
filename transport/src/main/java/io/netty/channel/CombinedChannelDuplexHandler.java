@@ -28,6 +28,12 @@ import java.net.SocketAddress;
 
 /**
  *  Combines a {@link ChannelInboundHandler} and a {@link ChannelOutboundHandler} into one {@link ChannelHandler}.
+ *  如果一个类同时实现了{@link ChannelInboundHandler}和{@link ChannelOutboundHandler}的话，
+ *  在某些情况下配置起来确实变得简单了，但其重用性可能会降低。
+ *  为了保持这种配置简单的特性同时提高重用性，就有了该类的诞生。
+ *  该类通过将{@link ChannelInboundHandler}和{@link ChannelOutboundHandler}组合到一起。
+ *  达到以上目的。
+ *
  */
 public class CombinedChannelDuplexHandler<I extends ChannelInboundHandler, O extends ChannelOutboundHandler>
         extends ChannelDuplexHandler {

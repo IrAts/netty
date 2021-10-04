@@ -36,7 +36,7 @@ import java.util.NoSuchElementException;
  * to give a user full control over how an event is handled and how the {@link ChannelHandler}s in a pipeline
  * interact with each other.
  * <br/>
- * 一个{@link ChannelHandler}的列表，用于处理或拦截* {@link Channel}的入站事件和出站操作。
+ * 一个{@link ChannelHandler}的列表，用于处理或拦截{@link Channel}的入站事件和出站操作。
  * {@link ChannelPipeline}实现的一种高级形式拦截过滤器模式给用户完全控制如何处理一个事件以及{@link ChannelHandler}如何与 pipeline 中的其他 handler 交互。
  *
  * <h3>Creation of a pipeline</h3>

@@ -201,6 +201,8 @@ public interface ChannelHandler {
     /**
      * Gets called after the {@link ChannelHandler} was removed from the actual context and it doesn't handle events
      * anymore.
+     * <br/>
+     * 从实际上下文中删除{@link ChannelHandler}后调用，它不再处理事件。
      */
     void handlerRemoved(ChannelHandlerContext ctx) throws Exception;
 
