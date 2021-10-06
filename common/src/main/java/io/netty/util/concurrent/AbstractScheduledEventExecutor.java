@@ -146,6 +146,8 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
     /**
      * Return the deadline (in nanoseconds) when the next scheduled task is ready to be run or {@code -1}
      * if no task is scheduled.
+     * <p>
+     * 返回最接近当前时间的下一个将要运行的计划任务的时间(以纳秒为单位)，如果没有计划任务则返回-1。
      */
     protected final long nextScheduledTaskDeadlineNanos() {
         ScheduledFutureTask<?> scheduledTask = peekScheduledTask();
@@ -286,9 +288,15 @@ public abstract class AbstractScheduledEventExecutor extends AbstractEventExecut
      * Returns {@code true} if the {@link EventExecutor} thread should be woken immediately to
      * process the scheduled task (if not already awake).
      * <p>
+     * 在预定的任务提交之前从任意非{@link EventExecutor}线程调用。
+     * 如果应该立即唤醒{@link EventExecutor}线程来处理计划中的任务(如果还没有唤醒)，则返回{@code true}。
+     * <p>
      * If {@code false} is returned, {@link #afterScheduledTaskSubmitted(long)} will be called with
      * the same value <i>after</i> the scheduled task is enqueued, providing another opportunity
      * to wake the {@link EventExecutor} thread if required.
+     *
+     * 如果返回{@code false}，{@link #afterScheduledTaskSubmitted(long)}将以相同的值在计划任务进入队列后调用，
+     * 提供另一个机会唤醒{@link EventExecutor}线程(如果需要)。
      *
      * @param deadlineNanos deadline of the to-be-scheduled task
      *     relative to {@link AbstractScheduledEventExecutor#nanoTime()}

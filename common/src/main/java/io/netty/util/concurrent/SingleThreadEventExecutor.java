@@ -74,6 +74,10 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
             AtomicReferenceFieldUpdater.newUpdater(
                     SingleThreadEventExecutor.class, ThreadProperties.class, "threadProperties");
 
+    /**
+     * 用来存储异步任务。
+     * 可通过 ctx.channel().eventLoop().execute(..)添加任务到这里。
+     */
     private final Queue<Runnable> taskQueue;
 
     private volatile Thread thread;
@@ -361,6 +365,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
 
     /**
      * Poll all tasks from the task queue and run them via {@link Runnable#run()} method.
+     * <p>
+     * 轮询任务队列中的所有任务，并通过{@link Runnable#run()}方法运行它们。
      *
      * @return {@code true} if and only if at least one task was run
      */
@@ -453,6 +459,9 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     /**
      * Poll all tasks from the task queue and run them via {@link Runnable#run()} method.  This method stops running
      * the tasks in the task queue and returns if it ran longer than {@code timeoutNanos}.
+     * <p>
+     * 轮询任务队列中的所有任务，并通过{@link Runnable#run()}方法运行它们。
+     * 这个方法停止运行任务队列中的任务，如果它运行的时间超过{@code timeoutNanos}则返回。
      */
     protected boolean runAllTasks(long timeoutNanos) {
         fetchFromScheduledTaskQueue();

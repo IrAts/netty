@@ -84,16 +84,25 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
  *
  * <h3>Beginning the handshake</h3>
  * <p>
- * Beside using the handshake {@link ChannelFuture} to get notified about the completion of the handshake it's
- * also possible to detect it by implement the
+ * Beside using the handshake {@link ChannelFuture} to get notified about the
+ * completion of the handshake. it's also possible to detect it by implement the
  * {@link ChannelInboundHandler#userEventTriggered(ChannelHandlerContext, Object)}
  * method and check for a {@link SslHandshakeCompletionEvent}.
+ * <p>
+ * 除了使用握手{@link ChannelFuture}来获得关于完成握手的通知,也可以通过实现
+ * {@link ChannelInboundHandler#userEventTriggered(ChannelHandlerContext, Object)}
+ * 方法来检测它，并检查{@link SslHandshakeCompletionEvent}。
+ *
  *
  * <h3>Handshake</h3>
  * <p>
- * The handshake will be automatically issued for you once the {@link Channel} is active and
- * {@link SSLEngine#getUseClientMode()} returns {@code true}.
+ * The handshake will be automatically issued for you once the {@link Channel}
+ * is active and {@link SSLEngine#getUseClientMode()} returns {@code true}.
  * So no need to bother with it by your self.
+ * <p>
+ * 一旦{@link Channel}激活并且{@link SSLEngine#getUseClientMode()}返回{@code true}，
+ * 握手将自动为您发出。所以不需要你自己操心。
+ *
  *
  * <h3>Closing the session</h3>
  * <p>
@@ -105,6 +114,13 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
  * it is not reusable, and consequently you should create a new
  * {@link SslHandler} with a new {@link SSLEngine} as explained in the
  * following section.
+ * <p>
+ * 要关闭SSL会话，应该调用{@link #closeOutbound()}方法，将{@code close_notify}
+ * 消息发送给远程对等体。一个例外是当你关闭{@link Channel}-{@link SslHandler}拦截
+ * 关闭请求并在通道自动关闭之前发送{@code close_notify}消息。一旦SSL会话关闭，它将不
+ * 能重用，因此你应该使用新的{@link SSLEngine}来创建一个新的{@link SslHandler}，
+ * 如下面章节所述。
+ *
  *
  * <h3>Restarting the session</h3>
  * <p>
@@ -112,6 +128,11 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
  * {@link SslHandler} from the {@link ChannelPipeline}, insert a new
  * {@link SslHandler} with a new {@link SSLEngine} into the pipeline,
  * and start the handshake process as described in the first section.
+ * <p>
+ * 想要重新启用SSL会话，你必须移除{@link ChannelPipeline}中已存在的{@link SslHandler}，
+ * 并且使用{@link SSLEngine}创建一个新的{@link SslHandler}注册到 pipeline，
+ * 然后按照第一节的描述开始握手过程。
+ *
  *
  * <h3>Implementing StartTLS</h3>
  * <p>
@@ -120,6 +141,10 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
  * connection.  Please note that it is different from SSL &middot; TLS, that
  * secures the wire from the beginning of the connection.  Typically, StartTLS
  * is composed of three steps:
+ * <p>
+ * <a href="https://en.wikipedia.org/wiki/STARTTLS">StartTLS</a>是在明文连接中间
+ * 保护线路的通信模式。请务必记住它与SSL &middot; TLS是不同的，它从连接开始时就保护了线路。
+ * 通常，StartTLS由三个步骤组成：
  * <ol>
  * <li>Client sends a StartTLS request to server.</li>
  * <li>Server sends a StartTLS response to client.</li>
@@ -136,6 +161,10 @@ import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
  * the StartTLS response.  Otherwise the client can send begin SSL handshake
  * before {@link SslHandler} is inserted to the {@link ChannelPipeline}, causing
  * data corruption.
+ * <p>
+ * 请记住你必须在发送StartTLS response前将{@link SslHandler}添加到 pipeline 中。否则，
+ * 客户端可以在将{@link SslHandler}插入到{@link ChannelPipeline}之前发送开始SSL握手，
+ * 导致数据损坏。
  * <p>
  * The client-side implementation is much simpler.
  * <ol>
@@ -460,11 +489,20 @@ public class SslHandler extends ByteToMessageDecoder implements ChannelOutboundH
         return handshakeTimeoutMillis;
     }
 
+    /**
+     * 设置超时时间，超时之后，握手 ChannelFuture 将会被通知失败。
+     * @param handshakeTimeout
+     * @param unit
+     */
     public void setHandshakeTimeout(long handshakeTimeout, TimeUnit unit) {
         checkNotNull(unit, "unit");
         setHandshakeTimeoutMillis(unit.toMillis(handshakeTimeout));
     }
 
+    /**
+     * 设置超时时间，超时之后，握手 ChannelFuture 将会被通知失败。
+     * @param handshakeTimeoutMillis
+     */
     public void setHandshakeTimeoutMillis(long handshakeTimeoutMillis) {
         this.handshakeTimeoutMillis = checkPositiveOrZero(handshakeTimeoutMillis, "handshakeTimeoutMillis");
     }

@@ -30,6 +30,7 @@ import java.net.SocketAddress;
 /**
  * A nexus to a network socket or a component which is capable of I/O
  * operations such as read, write, connect, and bind.
+ * 连接到网络套接字或能够进行读、写、连接和绑定等I/O操作的组件。
  * <p>
  * A channel provides a user:
  * <ul>
@@ -47,6 +48,9 @@ import java.net.SocketAddress;
  * been completed at the end of the call.  Instead, you will be returned with
  * a {@link ChannelFuture} instance which will notify you when the requested I/O
  * operation has succeeded, failed, or canceled.
+ * <p>
+ * 所有的IO操作都是异步的。这意味着任何IO调用将立即返回，而不保证请求的IO操作已在调用结束时完成。
+ * 相反，你将返回一个{@link ChannelFuture}实例，当请求的IO操作成功、失败或取消时，该实例将通知你。
  *
  * <h3>Channels are hierarchical</h3>
  * <p>
@@ -92,6 +96,49 @@ import java.net.SocketAddress;
  *      {@link ChannelHandlerMask#MASK_CHANNEL_ACTIVE}       Channel 已经连接到它的远程节点，现在可以收发数据
  *      {@link ChannelHandlerMask#MASK_CHANNEL_INACTIVE}     Channel 没有连接到远程节点
  *
+ * 注意：
+ * Channel并非是与Socket一样的存在，Socket是只用于应用层与传输层传输数据的，如下图：
+ *      传  ->  +--------+  ->  应
+ *      输      | Socket |      用
+ *      层  <-  +--------+  <-  层
+ *
+ * 对于应用层来说，从Socket中读取数据就等同于直接从传输层读取数据，如对于使用TCP传输时，应用层从Socket拿到
+ * 的数据就是一个字节流，应用层负责将这些字节解析成消息并进行相应的处理。即在此等抽象下，对从Socket读取的数据
+ * 进行解析并执行业务处理是应用层的工作。
+ * 在Netty中，进行数据解析和业务处理的是由多个 InboundHandler/OutboundHandler 组成的 Pipeline，即
+ * Pipeline 就是业务层，将上图完善就得：
+ *      传  ->  +--------+  ->  +-------------------------+
+ *      输      | Socket |      |        pipeline         |
+ *      层  <-  +--------+  <-  +-------------------------+
+ *
+ * 到现在，终于可以揭晓Channel的抽象到底处于哪个位置，看下图：
+ *      传  ->  +--------+  ->  +-------------------------+
+ *      输      | Socket |      |        pipeline         |
+ *      层  <-  +--------+  <-  +-------------------------+
+ *             |<--------------- Channel ---------------->|
+ *
+ * 很诡异，Channel竟然包括了Socket与应用层。。怎么得出这个结论的呢？这得从Channel的方法实现说起
+ * 对于方法{@link Channel#write(Object)}，写入数据的位置是pipeline的尾部。数据会从最后一个
+ * OutboundHandler一直往前流动，如下图：
+ *      传  ->  +--------+  ->  +-------------------------+
+ *      输      | Socket |      |        pipeline         |  <-- {@link Channel#write(Object)}
+ *      层  <-  +--------+  <-  +-------------------------+
+ *             |<--------------- Channel ---------------->|
+ *
+ * 对于方法{@link Channel#read()}，则会调用 pipeline 头部的 read() 方法，让 pipeline 从
+ * Socket 抽象中获取数据，即实际上是通过 Socket 从传输层获取数据。如下图：
+ *            +-------------------------------{@link Channel#read()}
+ *            ↓
+ *      传  ->  +--------+  ->  +-------------------------+
+ *      输      | Socket |      |        pipeline         |
+ *      层  <-  +--------+  <-  +-------------------------+
+ *             |<--------------- Channel ---------------->|
+ *
+ * 看了上面的两个方法的实现，也就能够理解为什么 Channel 抽象所处的位置是这样的了。
+ * 在我看来，Channel的抽象层设计有问题。我觉得更好的设计应该是让 Channel 和 Pipeline 独立开。
+ * 也就是让 Channel 在抽象上与 Socket 同等。这样的话{@link Channel#write(Object)}方法
+ * 会让写入的消息直接写道Socket，接着传递给传输层。而{@link Channel#read()}方法就是从传输层
+ * 读取数据。然后实现上将 Pipeline 和 Channel 包装为一个处理单元，EventLoop 注册这个处理单元。
  *
  */
 public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparable<Channel> {
@@ -229,36 +276,56 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
      *   <li>{@link #deregister(ChannelPromise)}</li>
      *   <li>{@link #voidPromise()}</li>
      * </ul>
+     *
+     * <p>
+     * <em>Unsafe</em>永远<em>不应该</em>被用户代码调用。这些方法只提供来实现实际的传输，并且必须从I/O线程调用，除了下面的方法：
+     * <ul>
+     *   <li>{@link #localAddress()}</li>
+     *   <li>{@link #remoteAddress()}</li>
+     *   <li>{@link #closeForcibly()}</li>
+     *   <li>{@link #register(EventLoop, ChannelPromise)}</li>
+     *   <li>{@link #deregister(ChannelPromise)}</li>
+     *   <li>{@link #voidPromise()}</li>
+     * </ul>
+     *
      */
     interface Unsafe {
 
         /**
          * Return the assigned {@link RecvByteBufAllocator.Handle} which will be used to allocate {@link ByteBuf}'s when
          * receiving data.
+         * <p>
+         * 返回指定的{@link RecvByteBufAllocator.Handle}，用于当接收数据时分配{@link ByteBuf}。
          */
         RecvByteBufAllocator.Handle recvBufAllocHandle();
 
         /**
-         * Return the {@link SocketAddress} to which is bound local or
-         * {@code null} if none.
+         * Return the {@link SocketAddress} to which is bound local or {@code null} if none.
+         * <p>
+         * 返回绑定到本地的{@link SocketAddress}，如果没有，返回{@code null}。
          */
         SocketAddress localAddress();
 
         /**
-         * Return the {@link SocketAddress} to which is bound remote or
-         * {@code null} if none is bound yet.
+         * Return the {@link SocketAddress} to which is bound remote or {@code null} if none is bound yet.
+         * <p>
+         * 返回远端绑定的{@link SocketAddress}，如果还没有绑定，则返回{@code null}
          */
         SocketAddress remoteAddress();
 
         /**
          * Register the {@link Channel} of the {@link ChannelPromise} and notify
          * the {@link ChannelFuture} once the registration was complete.
+         * <p>
+         * 注册{@link ChannelPromise}的{@link Channel}，并在注册完成后通知{@link ChannelFuture}。
          */
         void register(EventLoop eventLoop, ChannelPromise promise);
 
         /**
          * Bind the {@link SocketAddress} to the {@link Channel} of the {@link ChannelPromise} and notify
          * it once its done.
+         * <p>
+         * 绑定{@link SocketAddress}到{@link ChannelPromise}的{@link Channel}，并在它完成后通知它。
          */
         void bind(SocketAddress localAddress, ChannelPromise promise);
 
@@ -298,6 +365,9 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
         /**
          * Schedules a read operation that fills the inbound buffer of the first {@link ChannelInboundHandler} in the
          * {@link ChannelPipeline}.  If there's already a pending read operation, this method does nothing.
+         * <p>
+         * 调度一个读操作，填充{@link ChannelPipeline}中第一个{@link ChannelInboundHandler}的入站缓冲区。
+         * 如果已经有一个挂起的读操作，则此方法不执行任何操作。
          */
         void beginRead();
 
@@ -315,11 +385,16 @@ public interface Channel extends AttributeMap, ChannelOutboundInvoker, Comparabl
          * Return a special ChannelPromise which can be reused and passed to the operations in {@link Unsafe}.
          * It will never be notified of a success or error and so is only a placeholder for operations
          * that take a {@link ChannelPromise} as argument but for which you not want to get notified.
+         * <p>
+         * 返回一个特殊的ChannelPromise，它可以被重用并传递给{@link Unsafe}中的操作。
+         * 它永远不会收到成功或错误的通知，所以它只是一个占位符，用于接受{@link ChannelPromise}作为参数但你不想得到通知的操作。
          */
         ChannelPromise voidPromise();
 
         /**
          * Returns the {@link ChannelOutboundBuffer} of the {@link Channel} where the pending write requests are stored.
+         * <p>
+         * 返回存储挂起写请求的{@link Channel}的{@link ChannelOutboundBuffer}。
          */
         ChannelOutboundBuffer outboundBuffer();
     }

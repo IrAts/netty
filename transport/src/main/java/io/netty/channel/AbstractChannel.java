@@ -291,6 +291,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         return this;
     }
 
+    /**
+     * 111
+     * @param msg
+     * @return
+     */
     @Override
     public ChannelFuture write(Object msg) {
         return pipeline.write(msg);

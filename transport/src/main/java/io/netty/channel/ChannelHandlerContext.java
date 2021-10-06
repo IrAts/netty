@@ -26,6 +26,7 @@ import io.netty.util.concurrent.EventExecutor;
  * Enables a {@link ChannelHandler} to interact with its {@link ChannelPipeline}
  * and other handlers. Among other things a handler can notify the next {@link ChannelHandler} in the
  * {@link ChannelPipeline} as well as modify the {@link ChannelPipeline} it belongs to dynamically.
+ * <p>
  * 使一个{@link ChannelHandler}与它的{@link ChannelPipeline}和其他 handler 交互。
  * 除此之外，handler 还可以通知{@link ChannelPipeline}中的下一个{@link ChannelHandler}，并动态修改它所属的{@link ChannelPipeline}。
  *
@@ -33,9 +34,11 @@ import io.netty.util.concurrent.EventExecutor;
  *
  * You can notify the closest handler in the same {@link ChannelPipeline} by calling one of the various methods
  * provided here.
+ * <br/>
  * 你可以通过调用这里提供的各种方法之一来通知同一个{@link ChannelPipeline}中最接近的 handler。
- *
+ * <br/>
  * Please refer to {@link ChannelPipeline} to understand how an event flows.
+ * <br/>
  * 请参考{@link ChannelPipeline}了解事件如何流动。
  *
  * <h3>Modifying a pipeline</h3>
@@ -87,6 +90,18 @@ import io.netty.util.concurrent.EventExecutor;
  * {@link ChannelPipeline} to find out more about inbound and outbound operations,
  * what fundamental differences they have, how they flow in a  pipeline,  and how to handle
  * the operation in your application.
+ *
+ * ChannelHandlerContext 代表了 ChannelHandler 和 ChannelPipeline 之间的关联，
+ * 每当有 ChannelHandler 添加到 ChannelPipeline 中时，都会为该 ChannelHandler
+ * 创建一个新的 ChannelHandlerContext。ChannelHandlerContext 的主要功能是管理它
+ * 所关联的 ChannelHandler 和在同一个 ChannelPipeline 中的其他 ChannelHandler
+ * 之间的交互。
+ *
+ * ChannelHandlerContext 有很多的方法，其中一些方法也存在于 Channel 和 ChannelPipeline
+ * 本身上，但是有一点重要的不同。如果调用 Channel 或者 ChannelPipeline 上的这些方法，它们将
+ * 沿着整个 ChannelPipeline 进行传播。而调用位于 ChannelHandlerContext 上的相同方法，则
+ * 将从当前所关联的 ChannelHandler 开始，并且只会传播给位于该 ChannelPipeline 中的下一个
+ * 能够处理该事件的 ChannelHandler。
  */
 public interface ChannelHandlerContext extends AttributeMap, ChannelInboundInvoker, ChannelOutboundInvoker {
 
