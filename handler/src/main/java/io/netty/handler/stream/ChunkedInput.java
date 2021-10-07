@@ -27,6 +27,8 @@ public interface ChunkedInput<B> {
     /**
      * Return {@code true} if and only if there is no data left in the stream
      * and the stream has reached at its end.
+     * <br/>
+     * 返回{@code true}当且仅当流中没有数据且流已经到达它的末端时。
      */
     boolean isEndOfInput() throws Exception;
 
@@ -41,6 +43,11 @@ public interface ChunkedInput<B> {
      * <p>Fetches a chunked data from the stream. Once this method returns the last chunk
      * and thus the stream has reached at its end, any subsequent {@link #isEndOfInput()}
      * call must return {@code true}.
+     * <br/>
+     * 从流中获取分块数据。一旦该方法返回最后一个块，因此流已经到达它的末端，
+     * 任何后续的{@link #isEndOfInput()}调用都必须返回{@code true}。
+     * 如果流中没有数据则会返回{@code null}。请注意，{@code null}并不
+     * 一定意味着流已经到达它的末端。在慢流中，下一个块可能暂时不可用。
      *
      * @param ctx The context which provides a {@link ByteBufAllocator} if buffer allocation is necessary.
      * @return the fetched chunk.
@@ -56,6 +63,11 @@ public interface ChunkedInput<B> {
      * Fetches a chunked data from the stream. Once this method returns the last chunk
      * and thus the stream has reached at its end, any subsequent {@link #isEndOfInput()}
      * call must return {@code true}.
+     * <br/>
+     * 从流中获取分块数据。一旦该方法返回最后一个块，因此流已经到达它的末端，
+     * 任何后续的{@link #isEndOfInput()}调用都必须返回{@code true}。
+     * 如果流中没有数据则会返回{@code null}。请注意，{@code null}并不
+     * 一定意味着流已经到达它的末端。在慢流中，下一个块可能暂时不可用。
      *
      * @param allocator {@link ByteBufAllocator} if buffer allocation is necessary.
      * @return the fetched chunk.
@@ -68,6 +80,8 @@ public interface ChunkedInput<B> {
 
     /**
      * Returns the length of the input.
+     * <br/>
+     * 返回输入的长度。如果输入的长度未知的话则返回一个负值。
      * @return  the length of the input if the length of the input is known.
      *          a negative value if the length of the input is unknown.
      */
@@ -75,6 +89,8 @@ public interface ChunkedInput<B> {
 
     /**
      * Returns current transfer progress.
+     * <br/>
+     * 返回当前传输进度。
      */
     long progress();
 

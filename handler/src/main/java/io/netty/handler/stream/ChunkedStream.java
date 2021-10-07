@@ -32,6 +32,13 @@ import java.io.PushbackInputStream;
  * accurately as possible, rather than using the default implementation.
  * Otherwise, {@link ChunkedStream} will generate many too small chunks or
  * block unnecessarily often.
+ * <p>
+ * 请注意，将数据提供给{@link ChunkedStream}的{@link InputStream}实例必
+ * 须尽可能准确地实现{@link InputStream#available()}，而不是使用默认实现。
+ * 否则，{@link ChunkedStream}将生成许多不必要的小块或块。
+ * <p>
+ * {@link ChunkedStream}实现原理就跟{@link java.io.BufferedInputStream}差不多。。
+ *
  */
 public class ChunkedStream implements ChunkedInput<ByteBuf> {
 
