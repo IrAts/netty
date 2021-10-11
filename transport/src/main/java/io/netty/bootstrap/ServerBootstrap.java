@@ -224,12 +224,14 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
             final Channel child = (Channel) msg;
 
+            // 将启动时传入的childHandler加入到客户端的SocketChannel的PipeLine中。
             child.pipeline().addLast(childHandler);
-
+            // 设置客户端SocketChannel的TCP参数。
             setChannelOptions(child, childOptions, logger);
             setAttributes(child, childAttrs);
 
             try {
+                // 将客户端注册到多路复用器中。
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {

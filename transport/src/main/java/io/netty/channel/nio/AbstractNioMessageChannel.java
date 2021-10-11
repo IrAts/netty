@@ -91,6 +91,8 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                     exception = t;
                 }
 
+                // 接收到新的客户端后，触发PipeLine的ChannelRead方法。
+                // 默认实现中是将这些新的客户端通过ChannelRead方法传递给 ServerBootstrapAcceptor 来处理。
                 int size = readBuf.size();
                 for (int i = 0; i < size; i ++) {
                     readPending = false;
