@@ -59,6 +59,16 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         return allocHandle.continueReading();
     }
 
+    /**
+     * 这个unsafe将专门用于服务器端。
+     * 通过重写read()方法来用于接受客户端连接。
+     * 每一次read()方法的调用都尝试去接受一批客户端的连接请求。
+     * 并且将接受的客户端包装为{@link io.netty.channel.socket.nio.NioSocketChannel}。
+     *
+     * 接着这批接受客户端会依次流过服务端pipeline的channelRead()方法。
+     * 最终调用服务端pipeline的channelReadComplete()方法。
+     *
+     */
     private final class NioMessageUnsafe extends AbstractNioUnsafe {
 
         private final List<Object> readBuf = new ArrayList<Object>();

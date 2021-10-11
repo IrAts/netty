@@ -1419,6 +1419,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
         private void readIfIsAutoRead() {
             if (channel.config().isAutoRead()) {
+                // channel.read()方法实质上回调用channel.pipeline.read()方法。
+                // 而channel.pipeline.read()方法则会调用pipeline头部hanlder的handler.read()方法。
+                // 即最终回调用{@link HeadContext#read()}方法
                 channel.read();
             }
         }
