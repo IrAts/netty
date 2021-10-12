@@ -889,6 +889,9 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             int size;
             try {
+                // 在将msg挂到 outboundBuffer 之前，判断msg是否处于直接内存中。
+                // 如果不是的话，需要将msg复制到直接内存。
+                // 此时返回的msg是处于直接内存的msg。
                 msg = filterOutboundMessage(msg);
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
@@ -906,16 +909,34 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             outboundBuffer.addMessage(msg, size, promise);
         }
 
+        /**
+         * 首先判断Channel是否处于活动状态，如果已经失活，直接返回。
+         * 进行数据冻结操作，以禁止用户在数据写入 (JDK)SocketChannel 前进行cancel操作。
+         * 将数据flush到 (JDK)SocketChannel。
+         *
+         * 用户的write操作都是异步的，每次write都不会直接写到 (JDK)SocketChannel 中。
+         * 而是会将数据挂在对应Channel的 ChannelOutboundBuffer 中。
+         * 只有调用了flush操作才会将这些数据冲刷到(JDK)SocketChannel。
+         * 在开始flush之前，用户的write操作都是可以被取消的。
+         * 这里也就不难理解，注释中的 “pending write” 到底是什么意思了。
+         *
+         */
         @Override
         public final void flush() {
             assertEventLoop();
 
+            // 当 channel 已经处于非活动状态时，outboundBuffer == bull。
             ChannelOutboundBuffer outboundBuffer = this.outboundBuffer;
             if (outboundBuffer == null) {
                 return;
             }
 
+            // 预flush操作，将需要flush到 (JDK)SocketChannel 的数据进行冻结。
+            // 用户的write操作是异步的，在数据写出去前都可以对write操作进行cancel。
+            // 在flush数据前，对数据进行冻结以禁止用户在这段时间内对write操作进行cancel。
+            // 此外，该方法还会释放掉已经被用户cancel的write操作的数据。
             outboundBuffer.addFlush();
+            // 执行真正的flush操作，将数据冲刷到 (JDK)SocketChannel 中。
             flush0();
         }
 
@@ -934,6 +955,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             inFlush0 = true;
 
             // Mark all pending write requests as failure if the channel is inactive.
+            // 如果 channel 处于非活动状态，将所有挂起的write请求设置为failure。
             if (!isActive()) {
                 try {
                     // Check if we need to generate the exception at all.
@@ -952,6 +974,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             try {
+                // 真正的执行写操作。
                 doWrite(outboundBuffer);
             } catch (Throwable t) {
                 handleWriteError(t);

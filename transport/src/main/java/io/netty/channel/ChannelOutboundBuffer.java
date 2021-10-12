@@ -75,13 +75,27 @@ public final class ChannelOutboundBuffer {
 
     // Entry(flushedEntry) --> ... Entry(unflushedEntry) --> ... Entry(tailEntry)
     //
-    // The Entry that is the first in the linked-list structure that was flushed
+    /**
+     * 一般情况下该指针指向null。
+     * 只有触发了预flush操作{@link #addFlush()}时，该指针会指向unflushedEntry。
+     * 也就是第一个需要被冲刷到套接字的Entry。
+     * The Entry that is the first in the linked-list structure that was flushed
+     */
     private Entry flushedEntry;
-    // The Entry which is the first unflushed in the linked-list structure
+    /**
+     * 一般情况下该指针指向第一个需要被冲刷到套接字的Entry。
+     * 只有当触发了预flush操作{@link #addFlush()}时，该指针会便为null。
+     * 因为一旦启动了预flush操作，所有被挂起的数据都将会被flash。
+     * The Entry which is the first unflushed in the linked-list structure
+     */
     private Entry unflushedEntry;
-    // The Entry which represents the tail of the buffer
+    /**
+     * The Entry which represents the tail of the buffer
+     */
     private Entry tailEntry;
-    // The number of flushed entries that are not written yet
+    /**
+     * The number of flushed entries that are not written yet
+     */
     private int flushed;
 
     private int nioBufferCount;
@@ -252,6 +266,9 @@ public final class ChannelOutboundBuffer {
      * Will remove the current message, mark its {@link ChannelPromise} as success and return {@code true}. If no
      * flushed message exists at the time this method is called it will return {@code false} to signal that no more
      * messages are ready to be handled.
+     * <p>
+     * 将会移除调当头的数据，并且将对应的{@link ChannelPromise}标记为success并返回true。
+     * 如果没有任何需要被flush的数据存在，这个方法将会返回false以告知用户没有任何数据被处理。
      */
     public boolean remove() {
         Entry e = flushedEntry;

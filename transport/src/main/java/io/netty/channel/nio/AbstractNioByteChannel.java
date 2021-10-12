@@ -223,10 +223,14 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 in.remove();
                 return 0;
             }
-
+            // 执行冲刷(flush)，并获取成功冲刷出去的字节数。
             final int localFlushedAmount = doWriteBytes(buf);
+            // 注意：由于TCP的发送缓冲区可能满了，所以有可能一个字节都没有flush出去。
             if (localFlushedAmount > 0) {
                 in.progress(localFlushedAmount);
+                // 也有可能TCP的发送缓冲区剩余空间不足以将整个buf冲刷出去
+                // 所以这里要判断是否buf的所有内容都被冲刷完成。
+                // 只有buf中的数据全被冲刷出去了，才将buf从in中移除。
                 if (!buf.isReadable()) {
                     in.remove();
                 }
@@ -255,16 +259,21 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     }
 
     @Override
-    protected void doWrite(ChannelOutboundBuffer in) throws Exception {
+    protected void
+    doWrite(ChannelOutboundBuffer in) throws Exception {
         int writeSpinCount = config().getWriteSpinCount();
+        // 此循环将会一直从in中获取消息，然后写入到套接字中。
+        // 直到in中的消息全部被消费完或者循环次数达到默认最大值才会跳出循环。
         do {
             Object msg = in.current();
+            // 如果消息冲刷了，清除写标记位，并返回。
             if (msg == null) {
                 // Wrote all messages.
                 clearOpWrite();
                 // Directly return here so incompleteWrite(...) is not called.
                 return;
             }
+            // 执行冲刷
             writeSpinCount -= doWriteInternal(in, msg);
         } while (writeSpinCount > 0);
 
