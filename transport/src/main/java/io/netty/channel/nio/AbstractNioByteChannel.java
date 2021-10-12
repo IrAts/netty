@@ -146,6 +146,9 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             ByteBuf byteBuf = null;
             boolean close = false;
             try {
+                // 尽可能的从传输层读取数据，每一次读取都会触发 pipeline 的 channelRead() 方法。
+                // 直到某一次读取没有装满缓冲区或者读取到0字节的数据时，就会跳出循环。
+                // 此外，为了减少连续读对其他业务的阻塞，默认情况下当连续读取16次后，也会跳出循环。
                 do {
                     byteBuf = allocHandle.allocate(allocator);
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
@@ -167,6 +170,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                     byteBuf = null;
                 } while (allocHandle.continueReading());
 
+                // 触发 pipeline 的 channelReadComplete() 方法
                 allocHandle.readComplete();
                 pipeline.fireChannelReadComplete();
 

@@ -876,10 +876,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     // release message now to prevent resource-leak
                     ReferenceCountUtil.release(msg);
                 } finally {
-                    // If the outboundBuffer is null we know the channel was closed and so
-                    // need to fail the future right away. If it is not null the handling of the rest
-                    // will be done in flush0()
+                    // If the outboundBuffer is null we know the channel was
+                    // closed and so need to fail the future right away.
+                    // If it is not null the handling of the rest  will be done in flush0().
                     // See https://github.com/netty/netty/issues/2362
+                    // 如果outboundBuffer为空，我们知道通道已经关闭，因此需要立即失败。如果它不为空，其余的处理将在flush0()中完成。
                     safeSetFailure(promise,
                             newClosedChannelException(initialCloseCause, "write(Object, ChannelPromise)"));
                 }
