@@ -407,9 +407,22 @@ public final class ChannelOutboundBuffer {
      * {@link #nioBufferCount()} and {@link #nioBufferSize()} will return the number of NIO buffers in the returned
      * array and the total number of readable bytes of the NIO buffers respectively.
      * <p>
+     * 如果当前挂起的消息仅由{@link ByteBuf}组成，则返回 direct NIO 缓冲区数组。
+     * {@link #nioBufferCount()}和{@link #nioBufferSize()}将分别返回返回数组
+     * 中NIO缓冲区的数量和NIO缓冲区的可读字节总数。
+     * <p>
      * Note that the returned array is reused and thus should not escape
      * {@link AbstractChannel#doWrite(ChannelOutboundBuffer)}.
      * Refer to {@link NioSocketChannel#doWrite(ChannelOutboundBuffer)} for an example.
+     * <p>
+     * 注意：这个NIO缓冲区数组是会被重用的，所以返回的数组不应该逃逸出方法
+     * {@link AbstractChannel#doWrite(ChannelOutboundBuffer)}.
+     * <p>
+     * 这个方法会一直遍历 flushedEntry 作为所指向的数据链表，并尽可能的将链表的数据挪动到 ByteBuffer[] 中。
+     * 直到以下两种情况发生才会停止向 ByteBuffer[] 中添加数据：
+     *      1、整个 flushedEntry 链表的数据都已经被移动到 ByteBuffer[] 中。
+     *      2、ByteBuffer[] 中的数据已经足够多，以至于如果向 ByteBuffer[] 中再添加下一条数据其数据量会超过 maxBytes。
+     *
      * </p>
      * @param maxCount The maximum amount of buffers that will be added to the return value.
      * @param maxBytes A hint toward the maximum number of bytes to include as part of the return value. Note that this
@@ -446,16 +459,23 @@ public final class ChannelOutboundBuffer {
                         break;
                     }
                     nioBufferSize += readableBytes;
+                    // 当前(ByteBuf)buf里持有缓冲区的数量。
                     int count = entry.count;
                     if (count == -1) {
                         //noinspection ConstantValueVariableUse
+                        // 由于 ByteBuf 的实现不同，所以他们内部包含的 ByteBuffer 个数是不同的。
+                        // 对于 PooledByteBuf 和 UnpooledDirectByteBuf 这些实现则返回1。
+                        // 而对于 CompositeByteBuf 这样的合并缓冲区则需要进行实际计算。
                         entry.count = count = buf.nioBufferCount();
                     }
+                    // 计算所需要的 nioBuffers 数组的长度。
+                    // 如果不够则调用 expandNioBufferArray(nioBuffers, neededSpace, nioBufferCount) 扩容
                     int neededSpace = min(maxCount, nioBufferCount + count);
                     if (neededSpace > nioBuffers.length) {
                         nioBuffers = expandNioBufferArray(nioBuffers, neededSpace, nioBufferCount);
                         NIO_BUFFERS.set(threadLocalMap, nioBuffers);
                     }
+                    // 将(ByteBuf)buf里的 ByteBuffer 搞出来然后放到数组里。
                     if (count == 1) {
                         ByteBuffer nioBuf = entry.buf;
                         if (nioBuf == null) {
@@ -501,6 +521,15 @@ public final class ChannelOutboundBuffer {
         return nioBufferCount;
     }
 
+    /**
+     * 首先对数组的长度不断的翻倍，直到其长度大于neededSpace。
+     * 然后将 array 的数据复制到扩容后的数组并返回。
+     *
+     * @param array
+     * @param neededSpace
+     * @param size
+     * @return
+     */
     private static ByteBuffer[] expandNioBufferArray(ByteBuffer[] array, int neededSpace, int size) {
         int newCapacity = array.length;
         do {

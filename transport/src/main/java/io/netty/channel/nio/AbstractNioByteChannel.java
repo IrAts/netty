@@ -259,8 +259,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     }
 
     @Override
-    protected void
-    doWrite(ChannelOutboundBuffer in) throws Exception {
+    protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         int writeSpinCount = config().getWriteSpinCount();
         // 此循环将会一直从in中获取消息，然后写入到套接字中。
         // 直到in中的消息全部被消费完或者循环次数达到默认最大值才会跳出循环。

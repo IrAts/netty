@@ -367,6 +367,13 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
         return region.transferTo(javaChannel(), position);
     }
 
+    /**
+     *
+     *
+     * @param attempted 本应写入字节数
+     * @param written 实际写入的字节数
+     * @param oldMaxBytesPerGatheringWrite
+     */
     private void adjustMaxBytesPerGatheringWrite(int attempted, int written, int oldMaxBytesPerGatheringWrite) {
         // By default we track the SO_SNDBUF when ever it is explicitly set. However some OSes may dynamically change
         // SO_SNDBUF (and other characteristics that determine how much data can be written at once) so we should try
@@ -383,7 +390,9 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         SocketChannel ch = javaChannel();
+        // 一次OP_WRITE事件写入最大循环次数
         int writeSpinCount = config().getWriteSpinCount();
+        // 循环写入，直到写完了所有数据或者达到一次OP_WRITE事件写入最大循环次数。
         do {
             if (in.isEmpty()) {
                 // All written so clear OP_WRITE
@@ -393,6 +402,8 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             }
 
             // Ensure the pending writes are made of ByteBufs only.
+            // 获取每次可写入的最大字节数
+            // 根据每次可写的最大字节数来获取合适数量的 ByteBuffer。
             int maxBytesPerGatheringWrite = ((NioSocketChannelConfig) config).getMaxBytesPerGatheringWrite();
             ByteBuffer[] nioBuffers = in.nioBuffers(1024, maxBytesPerGatheringWrite);
             int nioBufferCnt = in.nioBufferCount();
@@ -411,6 +422,8 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                     ByteBuffer buffer = nioBuffers[0];
                     int attemptedBytes = buffer.remaining();
                     final int localWrittenBytes = ch.write(buffer);
+                    // 如果写入的字节数小于等于0，则说明要么套接字关闭了，要么传输层缓冲区满了，无法写入更多数据。
+                    // 此时标记一下写入失败（将会重新上设置OP_WRITE标记位），等后续再尝试。
                     if (localWrittenBytes <= 0) {
                         incompleteWrite(true);
                         return;
