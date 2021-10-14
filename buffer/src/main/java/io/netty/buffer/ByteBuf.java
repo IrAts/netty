@@ -33,12 +33,18 @@ import java.nio.charset.UnsupportedCharsetException;
  * A random and sequential accessible sequence of zero or more bytes (octets).
  * This interface provides an abstract view for one or more primitive byte
  * arrays ({@code byte[]}) and {@linkplain ByteBuffer NIO buffers}.
+ * <p>
+ * 由零或多个字节(八位字节)组成的随机顺序可访问序列。该接口为一个或多个原始字节数组
+ * ({@code byte[]})和{@linkplain ByteBuffer NIO buffers}提供了一个抽象视图。
  *
  * <h3>Creation of a buffer</h3>
  *
  * It is recommended to create a new buffer using the helper methods in
  * {@link Unpooled} rather than calling an individual implementation's
  * constructor.
+ * <p>
+ * 推荐通过调用工具类{@link Unpooled}的方法来创建缓冲区，而不推荐直接使用对应
+ * 缓冲区的构造器。
  *
  * <h3>Random Access Indexing</h3>
  *
@@ -47,6 +53,9 @@ import java.nio.charset.UnsupportedCharsetException;
  * It means the index of the first byte is always {@code 0} and the index of the last byte is
  * always {@link #capacity() capacity - 1}.  For example, to iterate all bytes of a buffer, you
  * can do the following, regardless of its internal implementation:
+ * <p>
+ * 就跟一个原始的字节数组一样，{@link ByteBuf}使用从0开始的索引。这意味着缓冲区
+ * 中第一个字节的索引永远是0，而最后一个字节的索引则总是为{@link #capacity() - 1}。
  *
  * <pre>
  * {@link ByteBuf} buffer = ...;
@@ -63,6 +72,10 @@ import java.nio.charset.UnsupportedCharsetException;
  * operation and {@link #writerIndex() writerIndex} for a write operation
  * respectively.  The following diagram shows how a buffer is segmented into
  * three areas by the two pointers:
+ * <p>
+ * {@link ByteBuf}提供了两个指针来支持顺序读/写操作。{@link #readerIndex()}
+ * 用于读操作，{@link #writerIndex()}用于写操作。下方的图展示了这两个指针如何
+ * 将缓冲区分段。
  *
  * <pre>
  *      +-------------------+------------------+------------------+
@@ -82,9 +95,18 @@ import java.nio.charset.UnsupportedCharsetException;
  * {@link ByteBuf} and no destination index is specified, the specified
  * buffer's {@link #writerIndex() writerIndex} is increased together.
  * <p>
+ * Readable bytes 段是存储实际数据的地方。任何以{@code read}或{@code skip}开头的
+ * 方法都会使{@link #readerIndex()}指针移动对应的字节数。如果读操作的入参是一个
+ * {@link ByteBuf}并且没有指定目标索引，这个入参的{@link ByteBuf}的{@link #writerIndex()}
+ * 指针也会被增加。
+ *
+ * <p>
  * If there's not enough content left, {@link IndexOutOfBoundsException} is
  * raised.  The default value of newly allocated, wrapped or copied buffer's
  * {@link #readerIndex() readerIndex} is {@code 0}.
+ * <p>
+ * 如果没有足够的内容，将会抛出{@link IndexOutOfBoundsException}。
+ * 新分配、包装或复制的缓冲区的{@link #readerIndex()}的默认值是{@code 0}。
  *
  * <pre>
  * // Iterates the readable bytes of a buffer.
@@ -103,11 +125,20 @@ import java.nio.charset.UnsupportedCharsetException;
  * and no source index is specified, the specified buffer's
  * {@link #readerIndex() readerIndex} is increased together.
  * <p>
+ * Writable bytes 段是待写入的部分，任何以{@code write}开头的方法都会让
+ * {@link #writerIndex()}写指针向前移动相应的字节数，如果入参是{@link ByteBuf}
+ * 并且没有指定一个读取索引，那么这个入参的{@link #readerIndex()}也会移动。
+ * <p>
  * If there's not enough writable bytes left, {@link IndexOutOfBoundsException}
  * is raised.  The default value of newly allocated buffer's
  * {@link #writerIndex() writerIndex} is {@code 0}.  The default value of
  * wrapped or copied buffer's {@link #writerIndex() writerIndex} is the
  * {@link #capacity() capacity} of the buffer.
+ * <p>
+ * 如果没有足够的可写字节，会抛出{@link IndexOutOfBoundsException}。
+ * 新分配的缓冲区的默认值{@link #writerIndex()}是{@code 0}。
+ * 包装或复制缓冲区的{@link #writerIndex() writerIndex}的
+ * 默认值是缓冲区的{@link #capacity() capacity}。
  *
  * <pre>
  * // Fills the writable bytes of a buffer with random integers.
@@ -463,6 +494,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Please note that the behavior of this method is different
      * from that of NIO buffer, which sets the {@code limit} to
      * the {@code capacity} of the buffer.
+     * <p>
+     * 清空缓冲区，只是简单的将读指针和写指针移动到0。
+     * 实质上并没有对底层字节数族的内容进行修改。
      */
     public abstract ByteBuf clear();
 
@@ -509,6 +543,11 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * to {@code 0} and {@code oldWriterIndex - oldReaderIndex} respectively.
      * <p>
      * Please refer to the class documentation for more detailed explanation.
+     * <p>
+     * 丢弃索引处于0到{@code readerIndex}之间的字节(这部分字节已经被读取了)。
+     * 该方法将会移动索引处于{@code readerIndex}和{@code writerIndex}的数
+     * 据到索引0处，并且重新设置{@code readerIndex}和{@code writerIndex}。
+     *
      */
     public abstract ByteBuf discardReadBytes();
 
@@ -517,6 +556,10 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * some, all, or none of read bytes depending on its internal implementation to reduce
      * overall memory bandwidth consumption at the cost of potentially additional memory
      * consumption.
+     * <p>
+     * 类似于{@link ByteBuf#discardReadBytes()}，
+     * 但这个方法可能丢弃一些或者所有被读过的字节，甚至不丢弃任何被读过字节，
+     * 这取决于它的内部实现，以潜在的额外内存消耗为代价减少总体内存带宽消耗。
      */
     public abstract ByteBuf discardSomeReadBytes();
 
