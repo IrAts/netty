@@ -275,6 +275,13 @@ import java.nio.charset.UnsupportedCharsetException;
  *
  * Please refer to {@link ByteBufInputStream} and
  * {@link ByteBufOutputStream}.
+ *
+ * <p>
+ * 由于 NIO 的 Channel 读写的参数都是 {@link ByteBuffer}，因此
+ * Netty 的 {@link ByteBuf} 必须提供API方便的将 {@link ByteBuf}
+ * 转换成 {@link ByteBuffer}，或者反向转换。
+ *
+ *
  */
 public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
 
@@ -505,12 +512,18 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * reposition the current {@code readerIndex} to the marked
      * {@code readerIndex} by calling {@link #resetReaderIndex()}.
      * The initial value of the marked {@code readerIndex} is {@code 0}.
+     * <p>
+     * 标记当前的缓冲区的 {@code readerIndex}。后续可以通过调用
+     * {@link #resetReaderIndex()} 方法将 {@code readerIndex}
+     * 重置为mark的位置。如没有调用过该方法，则mark的位置为0。
      */
     public abstract ByteBuf markReaderIndex();
 
     /**
      * Repositions the current {@code readerIndex} to the marked
      * {@code readerIndex} in this buffer.
+     * <p>
+     * 将 {@code readerIndex} 重置回mark的位置。
      *
      * @throws IndexOutOfBoundsException
      *         if the current {@code writerIndex} is less than the marked
@@ -523,12 +536,18 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * reposition the current {@code writerIndex} to the marked
      * {@code writerIndex} by calling {@link #resetWriterIndex()}.
      * The initial value of the marked {@code writerIndex} is {@code 0}.
+     * <p>
+     * 标记当前的缓冲区的 {@code writerIndex}。后续可以通过调用
+     * {@link #resetWriterIndex()} 方法将 {@code writerIndex}
+     * 重置为mark的位置。如没有调用过该方法，则mark的位置为0。
      */
     public abstract ByteBuf markWriterIndex();
 
     /**
      * Repositions the current {@code writerIndex} to the marked
      * {@code writerIndex} in this buffer.
+     * <p>
+     * 将 {@code writerIndex} 重置回mark的位置。
      *
      * @throws IndexOutOfBoundsException
      *         if the current {@code readerIndex} is greater than the marked
@@ -1414,6 +1433,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets an unsigned byte at the current {@code readerIndex} and increases
      * the {@code readerIndex} by {@code 1} in this buffer.
+     * 读取无符号字节值。
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 1}
@@ -1433,6 +1453,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets a 16-bit short integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 2} in this buffer.
+     * 小端法读取 short 值。
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 2}
@@ -1442,6 +1463,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets an unsigned 16-bit short integer at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 2} in this buffer.
+     * 大端法读取无符号short值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 2}
@@ -1452,6 +1474,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets an unsigned 16-bit short integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 2} in this buffer.
+     * 小端法读取无符号short值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 2}
@@ -1461,6 +1484,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets a 24-bit medium integer at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 3} in this buffer.
+     * 大端法读取3字节值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 3}
@@ -1471,6 +1495,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets a 24-bit medium integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the
      * {@code readerIndex} by {@code 3} in this buffer.
+     * 小端法读取3字节值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 3}
@@ -1480,6 +1505,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets an unsigned 24-bit medium integer at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 3} in this buffer.
+     * 大端法读取3字节无符号值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 3}
@@ -1490,6 +1516,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets an unsigned 24-bit medium integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 3} in this buffer.
+     * 小端法读取3字节无符号值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 3}
@@ -1499,6 +1526,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets a 32-bit integer at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 4} in this buffer.
+     * 大端法读取int值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 4}
@@ -1509,6 +1537,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets a 32-bit integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 4} in this buffer.
+     * 小端法读取int值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 4}
@@ -1518,7 +1547,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets an unsigned 32-bit integer at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 4} in this buffer.
-     *
+     * 大端法读取无符号int值
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 4}
      */
@@ -1528,6 +1557,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets an unsigned 32-bit integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 4} in this buffer.
+     * 小端法读取无符号int值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 4}
@@ -1537,6 +1567,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets a 64-bit integer at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 8} in this buffer.
+     * 大端法读取long值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 8}
@@ -1547,6 +1578,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets a 64-bit integer at the current {@code readerIndex}
      * in the Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 8} in this buffer.
+     * 小端法读取long值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 8}
@@ -1556,6 +1588,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets a 2-byte UTF-16 character at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 2} in this buffer.
+     * 大端法读取char值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 2}
@@ -1565,6 +1598,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets a 32-bit floating point number at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 4} in this buffer.
+     * 大端法读取float值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 4}
@@ -1575,6 +1609,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets a 32-bit floating point number at the current {@code readerIndex}
      * in Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 4} in this buffer.
+     * 小端法读取float值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 4}
@@ -1586,6 +1621,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Gets a 64-bit floating point number at the current {@code readerIndex}
      * and increases the {@code readerIndex} by {@code 8} in this buffer.
+     * 大端法读取double值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 8}
@@ -1596,6 +1632,7 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Gets a 64-bit floating point number at the current {@code readerIndex}
      * in Little Endian Byte Order and increases the {@code readerIndex}
      * by {@code 8} in this buffer.
+     * 小端法读取double值
      *
      * @throws IndexOutOfBoundsException
      *         if {@code this.readableBytes} is less than {@code 8}
@@ -1610,6 +1647,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * by the number of the transferred bytes (= {@code length}).
      * The returned buffer's {@code readerIndex} and {@code writerIndex} are
      * {@code 0} and {@code length} respectively.
+     * <p>
+     * 将当前 ByteBuf 中的数据读取到新创建的 ByteBuf 中，读取的长度为 length。
+     * 操作成功之后，返回的 ByteBuf 的 readerIndex 为0，writerIndex 为length。
      *
      * @param length the number of bytes to transfer
      *
@@ -1627,6 +1667,13 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * <p>
      * Also be aware that this method will NOT call {@link #retain()} and so the
      * reference count will NOT be increased.
+     * <p>
+     * 返回当前 ByteBuf 新创建的子区域，子区域与原 ByteBuf 共享缓
+     * 冲区，但是独立维护着自己的 readerIndex 和 writerIndex。
+     * 新创建的子区域 readerIndex 为0，writerIndex 为 length。
+     *
+     * 如何实现共享底层的缓冲区？实质上子区域中存放了一个映射关系，
+     * 当访问子区域的0位置时，将映射到原 readerIndex 的 ByteBuf 中。
      *
      * @param length the size of the new slice
      *
@@ -1645,6 +1692,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Note that this method returns a {@linkplain #retain() retained} buffer unlike {@link #readSlice(int)}.
      * This method behaves similarly to {@code readSlice(...).retain()} except that this method may return
      * a buffer implementation that produces less garbage.
+     * <p>
+     * 这方法和 {@link #readSlice(int)} 一样，
+     * 只不过会对切分出来的 {@link ByteBuf} 增加一次引用次数。
      *
      * @param length the size of the new slice
      *
@@ -1810,6 +1860,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * and increases the {@code writerIndex} by {@code 1} in this buffer.
      * If {@code this.writableBytes} is less than {@code 1}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeBoolean(boolean value);
 
@@ -1819,6 +1872,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * The 24 high-order bits of the specified value are ignored.
      * If {@code this.writableBytes} is less than {@code 1}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeByte(int value);
 
@@ -1828,6 +1884,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.  The 16 high-order bits of the specified value are ignored.
      * If {@code this.writableBytes} is less than {@code 2}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeShort(int value);
 
@@ -1838,6 +1897,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * The 16 high-order bits of the specified value are ignored.
      * If {@code this.writableBytes} is less than {@code 2}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeShortLE(int value);
 
@@ -1847,6 +1909,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.
      * If {@code this.writableBytes} is less than {@code 3}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeMedium(int value);
 
@@ -1857,6 +1922,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * buffer.
      * If {@code this.writableBytes} is less than {@code 3}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeMediumLE(int value);
 
@@ -1865,6 +1933,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * and increases the {@code writerIndex} by {@code 4} in this buffer.
      * If {@code this.writableBytes} is less than {@code 4}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeInt(int value);
 
@@ -1874,6 +1945,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * by {@code 4} in this buffer.
      * If {@code this.writableBytes} is less than {@code 4}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeIntLE(int value);
 
@@ -1883,6 +1957,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.
      * If {@code this.writableBytes} is less than {@code 8}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeLong(long value);
 
@@ -1893,6 +1970,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.
      * If {@code this.writableBytes} is less than {@code 8}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeLongLE(long value);
 
@@ -1902,6 +1982,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.  The 16 high-order bits of the specified value are ignored.
      * If {@code this.writableBytes} is less than {@code 2}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeChar(int value);
 
@@ -1911,6 +1994,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.
      * If {@code this.writableBytes} is less than {@code 4}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeFloat(float value);
 
@@ -1920,6 +2006,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * the {@code writerIndex} by {@code 4} in this buffer.
      * If {@code this.writableBytes} is less than {@code 4}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public ByteBuf writeFloatLE(float value) {
         return writeIntLE(Float.floatToRawIntBits(value));
@@ -1931,6 +2020,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.
      * If {@code this.writableBytes} is less than {@code 8}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeDouble(double value);
 
@@ -1940,6 +2032,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * the {@code writerIndex} by {@code 8} in this buffer.
      * If {@code this.writableBytes} is less than {@code 8}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public ByteBuf writeDoubleLE(double value) {
         return writeLongLE(Double.doubleToRawLongBits(value));
@@ -1957,6 +2052,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * If {@code this.writableBytes} is less than {@code src.readableBytes},
      * {@link #ensureWritable(int)} will be called in an attempt to expand
      * capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeBytes(ByteBuf src);
 
@@ -1970,6 +2068,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * {@link #writeBytes(ByteBuf, int, int)} does not.
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param length the number of bytes to transfer
      * @throws IndexOutOfBoundsException if {@code length} is greater then {@code src.readableBytes}
@@ -1982,6 +2083,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * by the number of the transferred bytes (= {@code length}).
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param srcIndex the first index of the source
      * @param length   the number of bytes to transfer
@@ -1998,6 +2102,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * by the number of the transferred bytes (= {@code src.length}).
      * If {@code this.writableBytes} is less than {@code src.length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeBytes(byte[] src);
 
@@ -2007,6 +2114,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * by the number of the transferred bytes (= {@code length}).
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param srcIndex the first index of the source
      * @param length   the number of bytes to transfer
@@ -2025,6 +2135,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * If {@code this.writableBytes} is less than {@code src.remaining()},
      * {@link #ensureWritable(int)} will be called in an attempt to expand
      * capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      */
     public abstract ByteBuf writeBytes(ByteBuffer src);
 
@@ -2034,6 +2147,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * {@code writerIndex} by the number of the transferred bytes.
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param length the number of bytes to transfer
      *
@@ -2049,6 +2165,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * {@code writerIndex} by the number of the transferred bytes.
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param length the maximum number of bytes to transfer
      *
@@ -2066,6 +2185,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * This method does not modify the channel's position.
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param position the file position at which the transfer is to begin
      * @param length the maximum number of bytes to transfer
@@ -2083,6 +2205,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * specified {@code length}.
      * If {@code this.writableBytes} is less than {@code length}, {@link #ensureWritable(int)}
      * will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param length the number of <tt>NUL</tt>s to write to the buffer
      */
@@ -2094,6 +2219,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * in this buffer.
      * If {@code this.writableBytes} is not large enough to write the whole sequence,
      * {@link #ensureWritable(int)} will be called in an attempt to expand capacity to accommodate.
+     * <p>
+     * 当要写入数据时，如果发现底层的字节数组空间不足。
+     * 会自动调用{@link #ensureWritable(int)}方法扩容。
      *
      * @param sequence to write
      * @param charset that should be used
