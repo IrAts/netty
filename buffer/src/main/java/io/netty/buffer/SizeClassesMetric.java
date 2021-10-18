@@ -22,6 +22,8 @@ public interface SizeClassesMetric {
 
     /**
      * Computes size from lookup table according to sizeIdx.
+     * <br/>
+     * 根据sizeIdx从查找表计算大小。
      *
      * @return size
      */
@@ -29,6 +31,8 @@ public interface SizeClassesMetric {
 
     /**
      * Computes size according to sizeIdx.
+     * <br/>
+     * 根据sizeIdx计算大小。
      *
      * @return size
      */
@@ -36,6 +40,8 @@ public interface SizeClassesMetric {
 
     /**
      * Computes size from lookup table according to pageIdx.
+     * <br/>
+     * 根据pageIdx从查找表计算大小。
      *
      * @return size which is multiples of pageSize.
      */
@@ -43,6 +49,8 @@ public interface SizeClassesMetric {
 
     /**
      * Computes size according to pageIdx.
+     * <br/>
+     * 根据pageIdx计算大小
      *
      * @return size which is multiples of pageSize
      */
@@ -50,6 +58,7 @@ public interface SizeClassesMetric {
 
     /**
      * Normalizes request size up to the nearest size class.
+     * <br/>
      *
      * @param size request size
      *
@@ -59,6 +68,7 @@ public interface SizeClassesMetric {
 
     /**
      * Normalizes request size up to the nearest pageSize class.
+     * <br/>
      *
      * @param pages multiples of pageSizes
      *
@@ -68,6 +78,7 @@ public interface SizeClassesMetric {
 
     /**
      * Normalizes request size down to the nearest pageSize class.
+     * <br/>
      *
      * @param pages multiples of pageSizes
      *
@@ -78,6 +89,7 @@ public interface SizeClassesMetric {
     /**
      * Normalizes usable size that would result from allocating an object with the
      * specified size and alignment.
+     * <br/>
      *
      * @param size request size
      *

@@ -34,13 +34,21 @@ import java.util.PriorityQueue;
  * in the byte array that has enough empty space to accommodate the requested size and
  * return a (long) handle that encodes this offset information, (this memory segment is then
  * marked as reserved so it is always used by exactly one ByteBuf and no more)
- *
+ * <p>
+ * 在开始时，我们预先分配一个长度为 chunkSize 的字节数组。当要申请一个指定长度的 ByteBUf 时，我们
+ * 在预先分配的字节数组中寻找第一个具有足够空间以容纳请求大小的位置，并返回编码此偏移量信息的(长)句柄。
+ * 这个句柄指向的内存段因此会被标记为 reserved(已被预定).
+ * <p>
  * For simplicity all sizes are normalized according to {@link PoolArena#size2SizeIdx(int)} method.
  * This ensures that when we request for memory segments of size > pageSize the normalizedCapacity
  * equals the next nearest size in {@link SizeClasses}.
+ * <p>
+ * 为了简单起见，所有大小都按照{@link PoolArena#size2SizeIdx(int)}方法进行规范化。
+ * 这确保当我们请求的内存段大于 pageSize 时，normalizedCapacity 等于{@link SizeClasses}中最近的大小。
  *
  *
  *  A chunk has the following layout:
+ *  一个chunk的布局如下：
  *
  *     /-----------------\
  *     | run             |
@@ -70,19 +78,21 @@ import java.util.PriorityQueue;
  * handle:
  * -------
  * a handle is a long number, the bit layout of a run looks like:
+ * 句柄是一个长数字，运行的位布局看起来像:
  *
  * oooooooo ooooooos ssssssss ssssssue bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb
  *
- * o: runOffset (page offset in the chunk), 15bit
- * s: size (number of pages) of this run, 15bit
- * u: isUsed?, 1bit
- * e: isSubpage?, 1bit
- * b: bitmapIdx of subpage, zero if it's not subpage, 32bit
+ * o: runOffset (page offset in the chunk), 15bit - 15位作run的偏移量
+ * s: size (number of pages) of this run, 15bit - 15位作run中的page数
+ * u: isUsed?, 1bit - 1位标记是否被使用
+ * e: isSubpage?, 1bit - 1位标记是否有subpage
+ * b: bitmapIdx of subpage, zero if it's not subpage, 32bit - 32位指示subpage的bitmapIdx，如没有subpage则为0
  *
  * runsAvailMap:
  * ------
  * a map which manages all runs (used and not in used).
  * For each run, the first runOffset and last runOffset are stored in runsAvailMap.
+ * 用于管理所有 run 的 map。
  * key: runOffset
  * value: handle
  *
@@ -91,15 +101,19 @@ import java.util.PriorityQueue;
  * an array of {@link PriorityQueue}.
  * Each queue manages same size of runs.
  * Runs are sorted by offset, so that we always allocate runs with smaller offset.
- *
+ * 一个{@link PriorityQueue}数组，每个queue管理相同大小的run，
+ * 这些 run 根据 offset 排序。所以我们总是用更小的偏移量来分配 run。
  *
  * Algorithm:
  * ----------
  *
- *   As we allocate runs, we update values stored in runsAvailMap and runsAvail so that the property is maintained.
+ *   As we allocate runs, we update values stored in runsAvailMap
+ *   and runsAvail so that the property is maintained.
+ *   随着我们分配 run，我们会更新存储在runsAvailMap和runsAvail中的值，以便维护属性。
  *
  * Initialization -
  *  In the beginning we store the initial run which is the whole chunk.
+ *  在运行初期，我们存储初始的run，也就是整个chunk。
  *  The initial run:
  *  runOffset = 0
  *  size = chunkSize
@@ -113,6 +127,8 @@ import java.util.PriorityQueue;
  * 1) find the first avail run using in runsAvails according to size
  * 2) if pages of run is larger than request pages then split it, and save the tailing run
  *    for later using
+ * 1) 根据大小在 runsAvails 中查找第一个效用的 run。
+ * 2) 如果A的页面大于请求页面，则拆分它，并保存尾A以便以后使用
  *
  * Algorithm: [allocateSubpage(size)]
  * ----------
