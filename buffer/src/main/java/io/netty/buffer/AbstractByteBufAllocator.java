@@ -248,6 +248,16 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         return StringUtil.simpleClassName(this) + "(directByDefault: " + directByDefault + ')';
     }
 
+    /**
+     * 根据{@code minNewCapacity}计算新的容量{@code newCapacity}。
+     * 如果{@code minNewCapacity}小于64KiB，{@code newCapacity}为64
+     * 如果{@code minNewCapacity}小于4MiB，{@code newCapacity}为大于等于{@code minNewCapacity}的最小二次幂值。
+     * 否则，{@code newCapacity}是4MiB的倍数，并且是大于{@code minNewCapacity}的最小值。
+     *
+     * @param minNewCapacity
+     * @param maxCapacity
+     * @return
+     */
     @Override
     public int calculateNewCapacity(int minNewCapacity, int maxCapacity) {
         checkPositiveOrZero(minNewCapacity, "minNewCapacity");
@@ -274,6 +284,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         }
 
         // 64 <= newCapacity is a power of 2 <= threshold
+        // 求大于或等于给定值的2次幂
         final int newCapacity = MathUtil.findNextPositivePowerOfTwo(Math.max(minNewCapacity, 64));
         return Math.min(newCapacity, maxCapacity);
     }

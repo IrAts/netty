@@ -24,11 +24,21 @@ import io.netty.util.internal.ReferenceCountUpdater;
  * Abstract base class for {@link ByteBuf} implementations that count references.
  */
 public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
+    /**
+     * 用于标识{@link #refCnt}字段在{@link AbstractReferenceCountedByteBuf}中的内存地址。
+     * 该内存地址的获取是JDK实现强相关的，如果使用SUN的JDK，它通过sun.misc.Unsafe的objectFieldOffset接口
+     * 来获得。ByteBuf的实现子类{@link UnpooledUnsafeDirectByteBuf}和{@link PooledUnsafeHeapByteBuf}
+     * 会使用到这个偏移量
+     */
     private static final long REFCNT_FIELD_OFFSET =
             ReferenceCountUpdater.getUnsafeOffset(AbstractReferenceCountedByteBuf.class, "refCnt");
+
     private static final AtomicIntegerFieldUpdater<AbstractReferenceCountedByteBuf> AIF_UPDATER =
             AtomicIntegerFieldUpdater.newUpdater(AbstractReferenceCountedByteBuf.class, "refCnt");
 
+    /**
+     * 这玩意是为了通过原子方式对成员变量进行更新等操作，以实现线程安全，消除锁。
+     */
     private static final ReferenceCountUpdater<AbstractReferenceCountedByteBuf> updater =
             new ReferenceCountUpdater<AbstractReferenceCountedByteBuf>() {
         @Override
@@ -41,7 +51,11 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
         }
     };
 
-    // Value might not equal "real" reference count, all access should be via the updater
+    /**
+     * 用于跟踪对象的引用次数。
+     * 值可能不等于“真实”引用计数，所有访问都应该通过更新器
+     * Value might not equal "real" reference count, all access should be via the updater
+     */
     @SuppressWarnings({"unused", "FieldMayBeFinal"})
     private volatile int refCnt = updater.initialValue();
 
@@ -114,6 +128,7 @@ public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
 
     /**
      * Called once {@link #refCnt()} is equals 0.
+     * 当{@link #refCnt()}变为0时调用。
      */
     protected abstract void deallocate();
 }

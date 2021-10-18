@@ -295,6 +295,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * capacity, the content of this buffer is truncated.  If the {@code newCapacity} is greater
      * than the current capacity, the buffer is appended with unspecified data whose length is
      * {@code (newCapacity - currentCapacity)}.
+     * <p>
+     * 调整此缓冲区的容量。如果{@code newCapacity}小于当前的容量，则缓冲区会被截断。
+     * 如果{@code newCapacity}大于当前的容量，则缓冲区的容量被设置为{@code newCapacity}。
      *
      * @throws IllegalArgumentException if the {@code newCapacity} is greater than {@link #maxCapacity()}
      */
@@ -463,6 +466,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Returns the maximum number of bytes which can be written for certain without involving
      * an internal reallocation or data-copy. The returned value will be &ge; {@link #writableBytes()}
      * and &le; {@link #maxWritableBytes()}.
+     * <p>
+     * 返回可以在不扩容情况下直接写入的字节数，内部调用了{@link #writableBytes()}。
      */
     public int maxFastWritableBytes() {
         return writableBytes();
@@ -1849,6 +1854,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Increases the current {@code readerIndex} by the specified
      * {@code length} in this buffer.
+     * <p>
+     * 让{@code readerIndex}移动length。
      *
      * @throws IndexOutOfBoundsException
      *         if {@code length} is greater than {@code this.readableBytes}
@@ -2409,6 +2416,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * @return A buffer whose readable content is equivalent to the buffer returned by {@link #slice()}.
      * However this buffer will share the capacity of the underlying buffer, and therefore allows access to all of the
      * underlying content if necessary.
+     * <p>
+     * 返回当前ByteBuf的复制对象，复制后返回的ByteBuf与操作的ByteBuf共享缓冲区内容，
+     * 只是维护自己独立的读写索引。这方法不会让引用次数增加。
      */
     public abstract ByteBuf duplicate();
 
@@ -2423,6 +2433,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Note that this method returns a {@linkplain #retain() retained} buffer unlike {@link #slice(int, int)}.
      * This method behaves similarly to {@code duplicate().retain()} except that this method may return
      * a buffer implementation that produces less garbage.
+     * <p>
+     * 返回当前ByteBuf的复制对象，复制后返回的ByteBuf与操作的ByteBuf共享缓冲区内容，
+     * 只是维护自己独立的读写索引。这方法会让引用次数增加。
      */
     public abstract ByteBuf retainedDuplicate();
 
@@ -2449,6 +2462,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * This method does not modify {@code readerIndex} or {@code writerIndex} of this buffer.
      * Please note that the returned NIO buffer will not see the changes of this buffer if this buffer
      * is a dynamic buffer and it adjusted its capacity.
+     * <p>
+     * 将当前ByteBuf可读缓冲区转换成ByteBuffer，两者共享一个缓冲区内容引用，对ByteBuffer的读写
+     * 并不会修改原ByteBuf的读写引用。需要注意的是，发那会的ByteBuf无法感知元拉ByteBuf的动态扩展操作。
      *
      * @throws UnsupportedOperationException
      *         if this buffer cannot create a {@link ByteBuffer} that shares the content with itself
@@ -2466,6 +2482,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * This method does not modify {@code readerIndex} or {@code writerIndex} of this buffer.
      * Please note that the returned NIO buffer will not see the changes of this buffer if this buffer
      * is a dynamic buffer and it adjusted its capacity.
+     * <p>
+     * 将当前ByteBuf从index开始长度为length的缓冲区转换成ByteBuffer，两者共享一个缓冲区内容引用，对ByteBuffer的读写
+     * 并不会修改原ByteBuf的读写引用。需要注意的是，发那会的ByteBuf无法感知元拉ByteBuf的动态扩展操作。
      *
      * @throws UnsupportedOperationException
      *         if this buffer cannot create a {@link ByteBuffer} that shares the content with itself
@@ -2520,11 +2539,16 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Returns {@code true} if and only if this buffer has a backing byte array.
      * If this method returns true, you can safely call {@link #array()} and
      * {@link #arrayOffset()}.
+     * <p>
+     * 判断当前ByteBuf是否基于自己数组实现。
      */
     public abstract boolean hasArray();
 
     /**
      * Returns the backing byte array of this buffer.
+     * <p>
+     * 在调用该方法前，最好调用{@link #hasArray()}方法
+     * 判断当前ByteBuf是否基于自己数组实现。
      *
      * @throws UnsupportedOperationException
      *         if there no accessible backing byte array
@@ -2543,11 +2567,15 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
     /**
      * Returns {@code true} if and only if this buffer has a reference to the low-level memory address that points
      * to the backing data.
+     * <p>
+     * 当且仅当该缓冲区有指向后备数据的底层内存地址的引用时返回{@code true}。
      */
     public abstract boolean hasMemoryAddress();
 
     /**
      * Returns the low-level memory address that point to the first byte of ths backing data.
+     * <p>
+     * 返回指向支持数据的第一个字节的低级内存地址。
      *
      * @throws UnsupportedOperationException
      *         if this buffer does not support accessing the low-level memory address

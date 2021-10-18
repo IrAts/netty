@@ -281,6 +281,13 @@ public abstract class AbstractByteBuf extends ByteBuf {
         return this;
     }
 
+    /**
+     * 将当前写索引和{@code minWritableBytes}相加得到目标应该写入到的位置。
+     * 如果空间不够则会进行扩容。注意，这里是直接扩容，而不会对{@link ByteBuf}
+     * 进行压缩，也就是{@link ByteBuf}左前方的已读区域是不会被清除掉的。
+     *
+     * @param minWritableBytes 需要写入的字节数
+     */
     final void ensureWritable0(int minWritableBytes) {
         final int writerIndex = writerIndex();
         final int targetCapacity = writerIndex + minWritableBytes;
@@ -297,6 +304,8 @@ public abstract class AbstractByteBuf extends ByteBuf {
         }
 
         // Normalize the target capacity to the power of 2.
+        // 获取当前ByteBuf不进行扩容情况下可以直接写入的字节数，也就是{@link #writableBytes()}。
+        // 如果剩余的可写入字节数不可以容纳 minWritableBytes 字节。则进行扩容。
         final int fastWritable = maxFastWritableBytes();
         int newCapacity = fastWritable >= minWritableBytes ? writerIndex + fastWritable
                 : alloc().calculateNewCapacity(targetCapacity, maxCapacity);
