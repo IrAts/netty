@@ -29,6 +29,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static io.netty.buffer.PoolChunk.isSubpage;
 import static java.lang.Math.max;
 
+/**
+ * Netty 分配内存的逻辑是和 jemalloc3 大致相同：
+ *      1.首先尝试从本地缓存中分配，分配成功则返回。
+ *      2.分配失败则委托 PoolArena 进行内存分配，PoolArena 最终还是委托 PoolChunk 进行内存分配。
+ *      3.PoolChunk 根据内存规格采取不同的分配策略。
+ *      4.内存回收时也是先通过本地线程缓存回收，如果实在回收不了或超出阈值，会交给关联的 PoolChunk 进行内存块回收。
+ */
 abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     static final boolean HAS_UNSAFE = PlatformDependent.hasUnsafe();
 

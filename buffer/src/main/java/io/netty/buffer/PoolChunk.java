@@ -144,6 +144,60 @@ import java.util.PriorityQueue;
  * 3) merge continuous avail runs
  * 4) save the merged run
  *
+ *
+ * <h2>中文</h2>
+ * PoolChunk 对象中有两个重要的变量用来替换 jemalloc3 的树的结构，分别是 LongPriorityQueue[] runsAvail 和 LongLongHashMap runsAvailMap。
+ *
+ * <h3>run</h3>
+ * run 是由若干个连续的 page 组成的内存块的代称，可以被 long 型的 handle 表示。随着内存块的分配和回收，PoolChunk 会管理着若干个不连续的 run。
+ *
+ * <h3>LongPriorityQueue</h3>
+ * LongPriorityQueue 属于小顶堆，存储 long （非 Long）型的句柄值，通过 LongPriorityQueue#poll() 方法每次都
+ * 能获取小顶堆内部的最小的 handle 值。这表示我们每次申请内存都是从最低位地址开始分配。而在 PoolChunk 内部有一个
+ * LongPriorityQueue[] 数组，所有存储在 LongPriorityQueue 对象的 handle 都表示一个可用的 run，它的默认长度为
+ * 40，为什么是 40 会在源码讲解时解释。
+ *
+ * <h3>LongLongHashMap</h3>
+ * 这个是特殊的存储 long 原型的 HashMap，底层采用线性探测法。Netty 使用 LongLongHashMap 存储某个 run 的首页偏
+ * 移量和句柄值的映射关系、最后一页偏移量和句柄值的映射关系。至于为什么这么存储，这是为了在向前、向后合并的过程中能
+ * 通过 pageOffset 偏移量获取句柄值，进而判断是否可以进行向前合并操作。
+ *
+ * <h3>句柄handle</h3>
+ * 一个句柄的位图如下：
+ *     oooooooo ooooooos ssssssss ssssssue bbbbbbbb bbbbbbbb bbbbbbbb bbbbbbbb
+ *    o: 15位的 pageOffset，指示这个run首页的偏移量
+ *    s: 15位的 pageCount，指示这个run重包含的page的数量。
+ *    u: isUsed?, 1bit - 1位标记是否被使用
+ *    e: isSubpage?, 1bit - 1位标记是否有subpage
+ *    b: bitmapIdx of subpage, zero if it's not subpage, 32bit - 32位指示subpage的bitmapIdx，如没有subpage则为0
+ *
+ * PoolChunk 默认向 JVM 申请个 16MB 的大的内存块，并拆分成 2048 个 page。可以想象为每个 page 进行标号，从 0 开始一
+ * 直到 2047。通过 pageOffset + pageCount 就能定位某一个 run 区域，它是由 pageCount 个 page 组成的，起始的 page
+ * 为 pageOffset。对 ByteBuffer 对象而言，内部会有一个 long 型的 memoryAddress 绝对地址，因此可以通过绝对地址 + 偏
+ * 移量定位任意 page 的实际地址。run 表示的是由若干个 page 组成的内存块。而 isUsed 则是标记当前 run 的使用状态。
+ * isSubpage 表示当前 run 是否用于 Small 级别内存分配。后 32 位表示 bitmap 的索引信息，与 jemalloc3 表示的含义一样。
+ *
+ * <h3>内存分配思路</h3>
+ * 首先尝试从本地缓存中分配，分配成功则返回，分配失败则委托 PoolArena 进行内存分配，PoolArena 最终还是委托 PoolChunk
+ * 进行内存分配，而 PoolChunk 就是 jemalloc4 算法的核心体现。Netty 在 jemalloc4 算法中取消了 Tiny，因此，只会有三种
+ * 规格，分别是 Small、Normal 以及 Huge。先总述一下 jemalloc4（Netty 实现）的算法分配逻辑:
+ *    1. Netty 默认一次性向 JVM 申请 16MB 大小的内存块，也是划分为 2048 个page，每个 page 大小为 8192（8KB）
+ *    2. 首先，根据用户申请的内存大小在 SizeClasses 查表得到确定的 index 索引值。
+ *    3. 通过判断 index 大小就可以知道采用什么策略。当 index<=38（对应 size<=28KB）时，表示当前分配 Small 级别大小的
+ *       内存块，采用 Small 级别分配策略。对于 38<index<nSize(75)（对应 size取值范围为 (28KB, 16MB]）表示当前分配
+ *       Normal 级别大小的内存块，采用 Normal 级别分配策略。对于 index 的其他值，则对应 Huge 级别。
+ *    4. 先讲 Normal 级别的内存分配，它有一个特点就是所需要的内存大小是 pageSize 的整数倍，PoolChunk 会从能满足当前分
+ *       配的 run（由 long 型的句柄表示，从 LongPriorityQueue[] 数组中搜索第一个最合适的 run） 中得到若干个 page。
+ *       当某一个 run 分配若干个 page 之后，可会还会有剩余空闲的 page，那么它根据剩余的空闲 pages 数量会从
+ *       LongPriorityQueue[] 数组选取一个合适的 LongPriorityQueue 存放全新的 run（handle 表示）。
+ *    5. 对于 Small 级别的内存分配，经过 SizeClass 规格化后得到规格值 size，然后求得 size 和 pageSize 最小公倍数 j，
+ *       j 一定是 pageSize 的整数倍。然后再按照 Normal 级别的内存分配方式从第一个适合的 run 中分配 (j/pageSize) 数量
+ *       的 page。接着将 page 所组成的内存块拆分成等分的 subpage，并使用 long[] 记录每份 subpage 的使用状态。
+ *
+ * <h3>run的回收</h3>
+ * 在回收某一个 run 之前，先尝试向前搜索并合并相邻的空闲的 run，得到一个全新的 handle。然后再向后搜索并合并相邻的空闲的
+ * run，得到一个全新的 handle。再把 handle 写回 LongPriorityQueue 和 LongLongHashMap 中，以待下次分配时使用。
+ *
  */
 final class PoolChunk<T> implements PoolChunkMetric {
     private static final int SIZE_BIT_LENGTH = 15;
@@ -156,9 +210,19 @@ final class PoolChunk<T> implements PoolChunkMetric {
     static final int SIZE_SHIFT = INUSED_BIT_LENGTH + IS_USED_SHIFT;
     static final int RUN_OFFSET_SHIFT = SIZE_BIT_LENGTH + SIZE_SHIFT;
 
+    /**
+     * netty内存池总的数据结构。
+     */
     final PoolArena<T> arena;
     final Object base;
+    /**
+     * 当前申请的内存块。默认大小是16M。
+     * 对于堆内存，T就是一个byte数组，对于直接内存，T就是ByteBuffer。
+     */
     final T memory;
+    /**
+     * 指定当前是否使用内存池的方式进行管理。
+     */
     final boolean unpooled;
 
     /**
@@ -172,12 +236,23 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private final LongPriorityQueue[] runsAvail;
 
     /**
-     * manage all subpages in this chunk
+     * manage all subpages in this chunk.
+     * 这里每一个PoolSubPage代表了二叉树的一个叶节点，也就是说，当二
+     * 叉树叶节点内存被分配之后，其会使用一个PoolSubPage对其进行封装。
      */
     private final PoolSubpage<T>[] subpages;
 
+    /**
+     * 记录了每个叶节点内存的大小，默认为8192，即8KB
+     */
     private final int pageSize;
+    /**
+     * 计算因子，用来计算能容纳申请容量的最大层数（root为第0层）。
+     */
     private final int pageShifts;
+    /**
+     * 记录了当前整个PoolChunk申请的内存大小，默认为16M
+     */
     private final int chunkSize;
 
     // Use as cache for ByteBuffer created from the memory. These are just duplicates and so are only a container
@@ -185,13 +260,28 @@ final class PoolChunk<T> implements PoolChunkMetric {
     // may produce extra GC, which can be greatly reduced by caching the duplicates.
     //
     // This may be null if the PoolChunk is unpooled as pooling the ByteBuffer instances does not make any sense here.
+    /**
+     * 对创建的ByteBuffer进行缓存的一个队列
+     */
     private final Deque<ByteBuffer> cachedNioBuffers;
 
+    /**
+     * 记录了当前PoolChunk中还剩余的可申请的字节数
+     */
     int freeBytes;
     int pinnedBytes;
 
+    /**
+     * 在Netty的内存池中，所有的PoolChunk都是由当前PoolChunkList进行组织的，
+     */
     PoolChunkList<T> parent;
+    /**
+     * 在PoolChunkList中当前PoolChunk的前置节点
+     */
     PoolChunk<T> prev;
+    /**
+     * 在PoolChunkList中当前PoolChunk的后置节点
+     */
     PoolChunk<T> next;
 
     // TODO: Test if adding padding helps under contention
@@ -309,8 +399,31 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return 100 - freePercentage;
     }
 
+    /**
+     * 按不同的类型采用不同的内存分配策略。
+     * <p>
+     * 对于内存的分配，主要会判断其是否大于8KB，如果大于8KB，则会直接
+     * 在PoolChunk的二叉树中年进行分配，如果小于8KB，则会直接申请一个
+     * 8KB的内存，然后将8KB的内存交由一个PoolSubpage进行维护。
+     * <p>
+     * 这里对PoolSubpage进行简单的描述，当我们从PoolChunk的二叉树中申
+     * 请到了8KB内存之后，会将其交由一个PoolSubpage进行维护。在PoolSubpage中，
+     * 会将整个内存块大小切分为一系列的16字节大小，这里就是8KB，也就是说，
+     * 它将被切分为512 = 8KB / 16byte份。为了标识这每一份是否被占用，
+     * PoolSubpage使用了一个long型数组来表示，该数组的名称为bitmap，因
+     * 而我们称其为位图数组。为了表示512份数据是否被占用，而一个long只有
+     * 64个字节，因而这里就需要8 = 512 / 64个long来表示，因而这里使用的
+     * 的是long型数组，而不是单独的一个long字段。
+     *
+     * @param buf
+     * @param reqCapacity
+     * @param sizeIdx
+     * @param cache
+     * @return
+     */
     boolean allocate(PooledByteBuf<T> buf, int reqCapacity, int sizeIdx, PoolThreadCache cache) {
         final long handle;
+        // sizeIdx <= arena.smallMaxSizeIdx的潜台词为：想要申请的内存块大小<=28KB
         if (sizeIdx <= arena.smallMaxSizeIdx) {
             // small
             handle = allocateSubpage(sizeIdx);
@@ -323,12 +436,16 @@ final class PoolChunk<T> implements PoolChunkMetric {
             // runSize must be multiple of pageSize
             int runSize = arena.sizeIdx2size(sizeIdx);
             handle = allocateRun(runSize);
+            // 如果返回的handle小于0，则表示要申请的内存大小超过了当前PoolChunk所能够申请的最大大小，也即16M，
+            // 因而返回false，外部代码则会直接申请目标内存，而不由当前PoolChunk处理。
             if (handle < 0) {
                 return false;
             }
         }
 
+        // 这里会从缓存的ByteBuf对象池中获取一个ByteBuf对象，不存在则返回null
         ByteBuffer nioBuffer = cachedNioBuffers != null? cachedNioBuffers.pollLast() : null;
+        // 通过申请到的内存数据对获取到的ByteBuf对象进行初始化，如果ByteBuf为null，则创建一个新的然后进行初始化
         initBuf(buf, nioBuffer, handle, reqCapacity, cache);
         return true;
     }
