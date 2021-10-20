@@ -49,14 +49,23 @@ public abstract class Recycler<T> {
             // NOOP
         }
     };
+    // 全局唯一ID，会有两个地方使用到，一个是每个 Recycler 初始化 OWN_THREAD_ID，另一个是每个WeakOrderQueue初始化id
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(Integer.MIN_VALUE);
+    // 全局ID生成器
     private static final int OWN_THREAD_ID = ID_GENERATOR.getAndIncrement();
+    // 每线程最大可缓存对象容量大小，默认值:4096
     private static final int DEFAULT_INITIAL_MAX_CAPACITY_PER_THREAD = 4 * 1024; // Use 4k instances as default.
+    // 每线程最大可缓存对象大小，默认值:4096
     private static final int DEFAULT_MAX_CAPACITY_PER_THREAD;
+    // 初始容量，默认值:256
     private static final int INITIAL_CAPACITY;
+    // 最大共享容量因子，默认值: 2
     private static final int MAX_SHARED_CAPACITY_FACTOR;
+    // 每线程最多延迟回收队列，默认值: 8
     private static final int MAX_DELAYED_QUEUES_PER_THREAD;
+    // Link用来存储异线程回收的对象，内部有一个数组，数组长度=LINK_CAPACITY，默认值: 16
     private static final int LINK_CAPACITY;
+    // 异线程丢弃对象比例，默认值:8。表示在异线程中，每8个回收对象只回收其中一个，其余丢弃。
     private static final int RATIO;
     private static final int DELAYED_QUEUE_RATIO;
 
@@ -109,12 +118,18 @@ public abstract class Recycler<T> {
         }
     }
 
+    // 每个线程所持有的 State<T> 数据结构内的数组的最大长度
     private final int maxCapacityPerThread;
+    // 共享容量因子。该值越大，在非本线程之外的待回收对象总数越小。
+    // 因为非本线程之外的待回收对象总数 = maxCapacityPerThread/maxSharedCapacityFactor
     private final int maxSharedCapacityFactor;
+    // 对于从未回收过的对象，Netty选择按一定比例（当）抛弃，避免池内缓存对象速度增长过快，从而影响主线程业务功能。默认值: 8
     private final int interval;
+    // 每线程对象池最多可缓存多少实例对象
     private final int maxDelayedQueuesPerThread;
     private final int delayedQueueInterval;
 
+    // 每个线程有对应的「Stack」
     private final FastThreadLocal<Stack<T>> threadLocal = new FastThreadLocal<Stack<T>>() {
         @Override
         protected Stack<T> initialValue() {
@@ -122,6 +137,7 @@ public abstract class Recycler<T> {
                     interval, maxDelayedQueuesPerThread, delayedQueueInterval);
         }
 
+        // 移除后回调方法
         @Override
         protected void onRemoval(Stack<T> value) {
             // Let us remove the WeakOrderQueue from the WeakHashMap directly if its safe to remove some overhead
@@ -271,8 +287,12 @@ public abstract class Recycler<T> {
         }
     }
 
+    // 用于异线程回收，每个线程保存其他线程的「WeakOrderQueue」
     private static final FastThreadLocal<Map<Stack<?>, WeakOrderQueue>> DELAYED_RECYCLED =
             new FastThreadLocal<Map<Stack<?>, WeakOrderQueue>>() {
+        // 为每个线程初始化一个「WeakHashMap」对象，保证在没有强引用的情况下能回收对象
+        // key=>Stack，
+        // value=>WeakOrderQueue，
         @Override
         protected Map<Stack<?>, WeakOrderQueue> initialValue() {
             return new WeakHashMap<Stack<?>, WeakOrderQueue>();
@@ -290,12 +310,22 @@ public abstract class Recycler<T> {
      * 有创建它的 Stack 引用）获取对应的 WeakOrderQueue，如果没有，则新建并更新 Stack 的 Head 节点（加锁）。这样就建
      * 立了Thread_1 和 Thread_2 关于对象 A 之间的关联，后续 Thread_1 就可以从 WeakOrderQueue 中回收对象了。
      *
+     * WeakOrderQueue 继承 WeakReference，当所属线程被回收时，相应的 WeakOrderQueue 也会被回收。
+     * 内部通过 Link 对象构成链表结构，Link 内部维护一个 DefaultHandle[] 数组用来暂存异线程回收对
+     * 象。添加时会判断是否会超出设置的阈值（默认值: 16），没有则添加成功，否则创建一个新的 Link 节
+     * 点并添加回收对象，接着更新链表结构，让 tail 指针指向新建的 Link 对象。由于线程不止一个，所以
+     * 对应的 WeakOrderQueue 也会有多个，WeakOrderQueue 之间则构成链表结构。变量 interval 作用
+     * 是回收"限流"，它从一开始就限制回收速率，每经过8 个对象才会回收一个，其余则丢弃。
+     *
      */
     private static final class WeakOrderQueue extends WeakReference<Thread> {
 
         static final WeakOrderQueue DUMMY = new WeakOrderQueue();
 
-        // Let Link extend AtomicInteger for intrinsics. The Link itself will be used as writerIndex.
+        /**
+         * Let Link extend AtomicInteger for intrinsics. The Link itself will be used as writerIndex.
+         * LINK 节点继承「AtomicInteger」，内部还有一个「readIndex」指针
+         */
         @SuppressWarnings("serial")
         static final class Link extends AtomicInteger {
             final DefaultHandle<?>[] elements = new DefaultHandle[LINK_CAPACITY];
@@ -364,12 +394,19 @@ public abstract class Recycler<T> {
         }
 
         // chain of data items
+        // Head节点管理「Link」对象的创建。内部next指向下一个「Link」节点，构成链表结构
         private final Head head;
+        // 数据存储节点
         private Link tail;
         // pointer to another queue of delayed items for the same stack
+        // 指向其他异线程的 WorkOrderQueue 链表
         private WeakOrderQueue next;
+        // 唯一ID
         private final int id = ID_GENERATOR.getAndIncrement();
+        // 可以理解为对回收动作限流。默认值: 8
+        // 并非到阻塞时才限流，而是一开始就这样做
         private final int interval;
+        // 已丢弃回收对象数量
         private int handleRecycleCount;
 
         private WeakOrderQueue() {
