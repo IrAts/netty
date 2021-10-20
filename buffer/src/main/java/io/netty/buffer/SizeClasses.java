@@ -210,6 +210,8 @@ import static io.netty.buffer.PoolThreadCache.*;
  * 可分为 512、640、768 等等，不再是 jemalloc3 只有 512、1024、2048 ... 这种粒度比较大的规格值了。
  * 这就是 jemalloc4 最大的提升。
  *
+ *
+ *
  * <h3>Netty内存规格</h3>
  *                                                    Netty内存规格
  *                                                         |
@@ -220,10 +222,14 @@ import static io.netty.buffer.PoolThreadCache.*;
  *   +—————+—————+——————+———————+——————+————+—————+—————+        +—————+—————+—————+       +16M
  *   |     |     |      |       |      |    |     |     |        |     |     |     |
  *  16B   32B   ...   1024B   1280B   ...   8K   ...   28K      32K   ...   14M   16M
- *   \                                                  /
- *     ——————————————————— Subpage ———————————————————
+ *   \                                      ↑           /                          ↑
+ *    \                                  pageSize      /                        chunkSize
+ *      —————————————————— Subpage ———————————————————
+ *
+ *
  *
  * <h3>SizeClasses#pageIdx2sizeTab</h3>
+ *
  * 抽取 SizeClasses 中 isMultiPageSize=1 的所有行组成下面的表格。每列表示含义解释如下:
  *    index: 对应 SizeClasses 的 index 列。
  *    size: 规格值。

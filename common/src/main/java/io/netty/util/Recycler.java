@@ -210,6 +210,18 @@ public abstract class Recycler<T> {
 
     public interface Handle<T> extends ObjectPool.Handle<T>  { }
 
+    /**
+     * 在图的右下角，它是 Recycler 对回收对象的包装类，Recycler 底层操作的对象是 DefaultHandle，
+     * 而非直接的回收的对象。它实现 Handle 接口，里面包含 recycle(Object obj) 回收方法。
+     *
+     * DefaultHandler 包装待回收对象，同时也添加了部分信息。比如用于重复回收检测
+     * 的 recycledId 和 lastRecycleId。lastRecycleId 用来存储最后一次回收对象
+     * 的RecycleId，recycledId 用来存 Recycler ID，这个值是通过 Recycler 全局
+     * 变量 ID_GENERATOR 创建，每当回收一个 DefaultHandle 对象（该对象内部包装
+     * 我们真正的回收对象），都会从 Recycler 对象中获得唯一 ID 值，一开始 recycledId
+     * 和 lastRecycledId 相等。后续通过判断两个值是否相等从而得出是否存在重复回收
+     * 对象的现象并抛出异常。
+     */
     @SuppressWarnings("unchecked")
     private static final class DefaultHandle<T> implements Handle<T> {
         private static final AtomicIntegerFieldUpdater<DefaultHandle<?>> LAST_RECYCLED_ID_UPDATER;
@@ -219,18 +231,25 @@ public abstract class Recycler<T> {
             LAST_RECYCLED_ID_UPDATER = (AtomicIntegerFieldUpdater<DefaultHandle<?>>) updater;
         }
 
+        // 上次回收此Handle的RecycleId
         volatile int lastRecycledId;
+        // 创建此 Handle 的 RecycleId。和 lastRecycledId 配合使用进行重复回收检测
         int recycleId;
-
+        // 该对象是否被回收过
         boolean hasBeenRecycled;
-
+        // 创建「DefaultHandle」的Stack对象
         Stack<?> stack;
+        // 待回收对象
         Object value;
 
         DefaultHandle(Stack<?> stack) {
             this.stack = stack;
         }
 
+        /**
+         * 回收此「Handle」所持有的对象「value」
+         * 如果对象不相等，抛出异常
+         */
         @Override
         public void recycle(Object object) {
             if (object != value) {
@@ -241,7 +260,7 @@ public abstract class Recycler<T> {
             if (lastRecycledId != recycleId || stack == null) {
                 throw new IllegalStateException("recycled already");
             }
-
+            // 将回收对象入栈，将自己会给Stack，剩下的交给Stack就好了
             stack.push(this);
         }
 
@@ -260,8 +279,18 @@ public abstract class Recycler<T> {
         }
     };
 
-    // a queue that makes only moderate guarantees about visibility: items are seen in the correct order,
-    // but we aren't absolutely guaranteed to ever see anything at all, thereby keeping the queue cheap to maintain
+    /**
+     * a queue that makes only moderate guarantees about visibility: items are seen in the correct order,
+     * but we aren't absolutely guaranteed to ever see anything at all, thereby keeping the queue cheap to maintain
+     *
+     * WeakOrderQueue 用于存储异线程回收本线程所分配的对象。比如对象 A 是由线程 Thread_1 分配，但是在 Thread_2 回收，
+     * 本着谁分配谁回收的原则，Thread_2 是不能回收对象的，所以 Thread_2 会把对象放入对应的 WeakOrderQueue 链表中，这
+     * 个链表是由 Thread_2 创建，那怎么与 Thread_1 关联呢? 这里就有一个技巧了，异线程会维护一个 Map<Stack<?> WeakOrderQueue>
+     * 本地线程缓存，Thread_2 会根据 Stack（因为内部是使用 DefaultHandler 包装回收对象，而这个 DefaultHandler 也持
+     * 有创建它的 Stack 引用）获取对应的 WeakOrderQueue，如果没有，则新建并更新 Stack 的 Head 节点（加锁）。这样就建
+     * 立了Thread_1 和 Thread_2 关于对象 A 之间的关联，后续 Thread_1 就可以从 WeakOrderQueue 中回收对象了。
+     *
+     */
     private static final class WeakOrderQueue extends WeakReference<Thread> {
 
         static final WeakOrderQueue DUMMY = new WeakOrderQueue();
@@ -502,12 +531,19 @@ public abstract class Recycler<T> {
         }
     }
 
+    /**
+     * Stack 中持有用来存储数据的 DefaultHandler[] 数组。
+     * 内部定义了与异线程回收相关的 WeakOrderQueue，还有一些安全变量和信息变量。
+     * Stack 对象是从 Recycle  内部的 FastThreadLocal 对象中获得，因此每个线程拥有属于自己的 Stack 对象，
+     * 创造了无锁的环境，并通过 weakOrderQueue 与其他线程建立沟通的桥梁。
+     */
     private static final class Stack<T> {
 
         // we keep a queue of per-thread queues, which is appended to once only, each time a new thread other
         // than the stack owner recycles: when we run out of items in our stack we iterate this collection
         // to scavenge those that can be reused. this permits us to incur minimal thread synchronisation whilst
         // still recycling all items.
+        // Stack是被哪个「Recycler」创建的
         final Recycler<T> parent;
 
         // We store the Thread in a WeakReference as otherwise we may be the only ones that still hold a strong
@@ -516,16 +552,33 @@ public abstract class Recycler<T> {
         // The biggest issue is if we do not use a WeakReference the Thread may not be able to be collected at all if
         // the user will store a reference to the DefaultHandle somewhere and never clear this reference (or not clear
         // it in a timely manner).
+        // 我们将线程存储在WeakReference中，否则我们可能是唯一一个在线程死后仍然
+        // 持有对线程本身的强引用的线程，因为DefaultHandle将持有对Stack的引用。
+        // 最大的问题是，如果我们不使用WeakReference，如果用户将DefaultHandle的引用存储在
+        // 某个地方，并且从来没有清除这个引用(或没有及时清除它)，线程可能根本无法被收集。
         final WeakReference<Thread> threadRef;
+        // 该「Stack」所对应其他线程剩余可缓存对象实例个数（就是其他线程此时可缓存对象数是多少）
+        // 默认值: 2048
         final AtomicInteger availableSharedCapacity;
+        // 一个线程可同时缓存多少个「Stack」对象。这个「Stack」可以理解为其他线程的「Stack」
+        // 毕竟不可能缓存所有的「Stack」吧，所以需要做一点限制
+        // 默认值: 8
         private final int maxDelayedQueues;
-
+        // 数组最大容量。默认值: 4096
         private final int maxCapacity;
+        // 可以理解为对回收动作限流。默认值: 8
+        // 并非到阻塞时才限流，而是一开始就这样做
         private final int interval;
         private final int delayedQueueInterval;
+        // 存储缓存数据的数组。默认值: 256
         DefaultHandle<?>[] elements;
+        // 数组中非空元素数量。默认值: 0
         int size;
+        // 跳过回收对象的数量。从0开始计数，每跳过一个回收对象+1。
+        // 当 handleRecycleCount > interval 时重置 handleRecycleCount = 0
+        // 默认值: 8。初始值和「interval」，以便第一个元素能被回收
         private int handleRecycleCount;
+        // 与异线程回收的相关三个节点
         private WeakOrderQueue cursor, prev;
         private volatile WeakOrderQueue head;
 

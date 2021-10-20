@@ -36,12 +36,29 @@ import java.util.concurrent.atomic.AtomicInteger;
  * The internal data structure that stores the thread-local variables for Netty and all {@link FastThreadLocal}s.
  * Note that this class is for internal use only and is subject to change at any time.  Use {@link FastThreadLocal}
  * unless you know what you are doing.
+ *
+ * 回顾TheadLocal，它使用 ThreadLocalMap 存储数据，而 ThreadLocalMap 底层采用线性探测法解决 Hash 冲突问题，
+ * 在空间和时间上寻求平衡。但 Netty 对这样的平衡并不满意，因此重新设计，使用 InternalThreadLocalMap 存储数据。
+ * 核心思想是以空间换时间，在实现时并没有使用线性探测，也没有使用哈希定位，而是使用了数组下标索引定位。这里主要用
+ * 到 nextIndex 和 Object[] 两个变量存储相应数据。每创建一个 FastThreadLocal 对象就从 {@link #nextIndex}
+ * 的 getAndIncrement() 方法获取索引值并保存在 FastThreadLocal#index 变量中，这个索引对应 Object[] 下标对
+ * 应，通过索引值就能获取 FastThreadLocal 对象保存的值，这对于频繁获取值是非常高效的。
+ *
+ * 其中有一个特殊情况，indexedVariables[0] 会存储一个 Set 集合，记录已创建的 FastThreadLocal 对象，方便在
+ * removeAll() 方法中只需要遍历 Object[0] 的 Set 集合找到对应的数据并删除。
+ *
+ * 需要注意的是，在使用 FastThreadLocal 的时候请务必配合 FastThreadLocalThread 使用。如果在普通线程中使用
+ * FastThreadLocal，会导致该线程的 InternalThreadLocalMap 存储到 (JDK)ThreadLocalMap 中。当该线程想要通
+ * 过 FastThreadLocal 获取值时，会先从 (JDK)ThreadLocalMap 拿到 InternalThreadLocalMap，接着再使用获取
+ * 到的 InternalThreadLocalMap 获取 FastThreadLocal 对应的值。比直接通过 (JDK)ThreadLocalMap 还要慢。
+ *
  */
 public final class InternalThreadLocalMap extends UnpaddedInternalThreadLocalMap {
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(InternalThreadLocalMap.class);
     private static final ThreadLocal<InternalThreadLocalMap> slowThreadLocalMap =
             new ThreadLocal<InternalThreadLocalMap>();
+    // 每创建一个「FastThreadLocal」就+1。0有特殊用途。
     private static final AtomicInteger nextIndex = new AtomicInteger();
 
     private static final int DEFAULT_ARRAY_LIST_INITIAL_CAPACITY = 8;
@@ -53,6 +70,7 @@ public final class InternalThreadLocalMap extends UnpaddedInternalThreadLocalMap
     public static final Object UNSET = new Object();
 
     /** Used by {@link FastThreadLocal} */
+    // 「FastThreadLocal」数据存储对象，默认长度:32
     private Object[] indexedVariables;
 
     // Core thread-locals
@@ -94,15 +112,30 @@ public final class InternalThreadLocalMap extends UnpaddedInternalThreadLocalMap
         return slowThreadLocalMap.get();
     }
 
+    /**
+     * 获取当前线程的 InternalThreadLocalMap。
+     * 如果当前线程不是 FastThreadLocalThread，则返回普通的 ThreadLocalMap。
+     */
     public static InternalThreadLocalMap get() {
         Thread thread = Thread.currentThread();
+        // 判断是否为 FastThreadLocalThread，只有它才有index索引值
         if (thread instanceof FastThreadLocalThread) {
             return fastGet((FastThreadLocalThread) thread);
         } else {
+            // 如果非 FastThreadLocalThread，Netty的做法是通过ThreadLocal对象保存一个
+            // InternalThreadLocalMap 对象，间接实现。
             return slowGet();
         }
     }
 
+    /**
+     * 获取 FastThreadLocalThread 内部的 InternalThreadLocalMap。
+     * 如果没有则初始化一个 InternalThreadLocalMap 并设置到 FastThreadLocalThread 中。
+     * 然后再返回这个 InternalThreadLocalMap。
+     *
+     * @param thread
+     * @return
+     */
     private static InternalThreadLocalMap fastGet(FastThreadLocalThread thread) {
         InternalThreadLocalMap threadLocalMap = thread.threadLocalMap();
         if (threadLocalMap == null) {
@@ -111,8 +144,20 @@ public final class InternalThreadLocalMap extends UnpaddedInternalThreadLocalMap
         return threadLocalMap;
     }
 
+    /**
+     * 非FastThreadLocalThread线程类型获取比较曲折。
+     * 首先，Thread内存没有InternalThreadLocalMap变量
+     * 因此需要通过ThreadLocal变相保存InternalThreadLocalMap。
+     * 因此慢获取一个值会经历两个步骤:
+     *   ① 首先通过slowGet()方法获取InternalThreadLocalMap对象
+     *   ② 从InternalThreadLocalMap对象获取值
+     * 所以还不如直接使用ThreadLocal保存对象值来得更快些。
+     * 因此，如果FastThreadLocal没有配合FastThread使用的话，可能性能会变得更慢
+     */
     private static InternalThreadLocalMap slowGet() {
+        // 从 JDK 的 ThreadLocalMap 中获取到当前线程的 InternalThreadLocalMap
         InternalThreadLocalMap ret = slowThreadLocalMap.get();
+        // 如果没有则生成一个新的并放到 JDK 的 ThreadLocalMap 中。
         if (ret == null) {
             ret = new InternalThreadLocalMap();
             slowThreadLocalMap.set(ret);

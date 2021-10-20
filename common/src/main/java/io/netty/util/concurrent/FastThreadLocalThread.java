@@ -20,6 +20,9 @@ import io.netty.util.internal.UnstableApi;
 
 /**
  * A special {@link Thread} that provides fast access to {@link FastThreadLocal} variables.
+ * FastThreadLocalThread 是对 Thread 类的一层包装，
+ * Netty 提供 DefaultThreadFactory 工厂类创建 FastThreadLocalThread 线程。
+ * 主要是为 Thread 添加 {@link #threadLocalMap} 这个重要的类变量。
  */
 public class FastThreadLocalThread extends Thread {
     // This will be set to true if we have a chance to wrap the Runnable.
