@@ -53,6 +53,19 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         bitmap = null;
     }
 
+    /**
+     * 在初始化的时候，就会将自己添加到 head 牵头表示的链表中。
+     * 这个链表被 PoolArena 持有。所以后续 PoolArena 都可以
+     * 直接调用该类的方法分配 PoolSubpage 。（当然前提是这个
+     * 还有剩余空间可用）
+     *
+     * @param head
+     * @param chunk
+     * @param pageShifts
+     * @param runOffset
+     * @param runSize
+     * @param elemSize
+     */
     PoolSubpage(PoolSubpage<T> head, PoolChunk<T> chunk, int pageShifts, int runOffset, int runSize, int elemSize) {
         this.chunk = chunk;
         this.pageShifts = pageShifts;
@@ -74,6 +87,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
                 bitmap[i] = 0;
             }
         }
+        // 添加至双向链表中，供后续分配使用
         addToPool(head);
     }
 
@@ -81,20 +95,32 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
      * Returns the bitmap index of the subpage allocation.
      */
     long allocate() {
+        // 无可用分片返回-1
         if (numAvail == 0 || !doNotDestroy) {
             return -1;
         }
 
+        // #1 获取下一个可用的分片索引（绝对值），第一个索引值为0
         final int bitmapIdx = getNextAvail();
+        // #2 除以64，确定bitmap[]哪一个，第一个bitmap索引值为0
         int q = bitmapIdx >>> 6;
+        // #3 &63: 确认64位长度long的哪一位，除以64取余，获取当前绝对 id 的偏移量
+        //    63: 0011 1111
         int r = bitmapIdx & 63;
         assert (bitmap[q] >>> r & 1) == 0;
+
+        // 更新第r位的值为1
+        // << 优先级高于 |=
         bitmap[q] |= 1L << r;
 
+        // 更新可用数量
         if (-- numAvail == 0) {
+            // 如果可用数量为0，表示子页中再无可分配的空间
+            // 需要从双向链表中移除
             removeFromPool();
         }
 
+        // 将bitmapIdx 转换为long存储，long 高32位存储的是小内存位置索引
         return toHandle(bitmapIdx);
     }
 
@@ -169,24 +195,41 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         return findNextAvail();
     }
 
+    /**
+     * 获取下一个可用的「分片内存块」
+     * 本质是搜索 bitmap[] 数组为0的索引值
+     */
     private int findNextAvail() {
         final long[] bitmap = this.bitmap;
         final int bitmapLength = this.bitmapLength;
+        // 循环遍历
         for (int i = 0; i < bitmapLength; i ++) {
             long bits = bitmap[i];
+            // #1 先判断整个bits是否有「0」位
+            // 不可用时bits为「0XFFFFFFFFFFFFFFFF」，~bits=0
+            // 可用时~bits !=0
             if (~bits != 0) {
+                // #2 找寻可用的位
                 return findNextAvail0(i, bits);
             }
         }
         return -1;
     }
 
+    /**
+     * 搜索下一个可用位
+     */
     private int findNextAvail0(int i, long bits) {
         final int maxNumElems = this.maxNumElems;
+        // i << 6 => i * 2^6=i*64
+        // 想象把long[]展开，baseVal就是基址
         final int baseVal = i << 6;
 
         for (int j = 0; j < 64; j ++) {
+            // bits & 1: 判断最低位是否为0
             if ((bits & 1) == 0) {
+                // 找到空闲子块，组装数据
+                // baseVal|j => baseVal + j，基址+位的偏移值
                 int val = baseVal | j;
                 if (val < maxNumElems) {
                     return val;
@@ -194,6 +237,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
                     break;
                 }
             }
+            // 无符号右移1位
             bits >>>= 1;
         }
         return -1;

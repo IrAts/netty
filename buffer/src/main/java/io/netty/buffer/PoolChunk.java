@@ -631,6 +631,20 @@ final class PoolChunk<T> implements PoolChunkMetric {
     /**
      * Create / initialize a new PoolSubpage of normCapacity. Any PoolSubpage created / initialized here is added to
      * subpage pool in the PoolArena that owns this PoolChunk
+     * <p>
+     * 申请 small 级别的内存。
+     * 根据 sizeIdx 可以计算出调用方想要申请的内存大小为 size。
+     * 在根据 size 和 page 计算出最小公倍数 num。这个 num 就是我们要申请的 page 数。
+     * 然后使用申请 num 个 page 的 run。
+     * 将这个 run 切分为 n 个 size 大小的小片，并包装为 PoolSubpage 待后续使用。
+     * <p>
+     * 来到这个方法说明 PoolArena 中真的一滴都不剩这种类型的空间了。
+     * <p>
+     * 之前jemalloc3 只是等分其中的一个 page。而 jemalloc4 是等分 N 个 page，其中 N>=1。
+     * 这个 N 的取值是拆分规格值和 pageSize 的最小公倍数再除以 pageSize。比如申请内存大小
+     * 为 16Byte，则只需要等分 1 个page，而申请内存大小为 28KB，需要等分 7 个 page，因为
+     * 它 28KB=28672 和 pageSize=8192 的最小公倍数为 57344（57344/8192=7）。这样就能满
+     * 足类型 28KB 这种不是 2 的次幂的内存大小。
      *
      * @param sizeIdx sizeIdx of normalized size
      *
@@ -639,16 +653,21 @@ final class PoolChunk<T> implements PoolChunkMetric {
     private long allocateSubpage(int sizeIdx) {
         // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.
         // This is need as we may add it back and so alter the linked-list structure.
+        // #1 从「PoolArena」获取索引对应的「PoolSubpage」。
+        //    在「SizeClasses」中划分为 Small 级别的一共有 39 个，
+        //    所以在 PoolArena#smallSubpagePools数组长度也为39，数组索引与sizeIdx一一对应
         PoolSubpage<T> head = arena.findSubpagePoolHead(sizeIdx);
+        // PoolSubpage 链表是共享变量，需要加锁
         synchronized (head) {
-            //allocate a new run
+            // #2 获取拆分规格值和pageSize的最小公倍数
             int runSize = calculateRunSize(sizeIdx);
-            //runSize must be multiples of pageSize
+            // #3 申请若干个page，runSize是pageSize的整数倍
             long runHandle = allocateRun(runSize);
-            if (runHandle < 0) {
+            if (runHandle < 0) {// 分配失败
                 return -1;
             }
 
+            // #4 实例化「PoolSubpage」对象
             int runOffset = runOffset(runHandle);
             assert subpages[runOffset] == null;
             int elemSize = arena.sizeIdx2size(sizeIdx);
@@ -656,7 +675,10 @@ final class PoolChunk<T> implements PoolChunkMetric {
             PoolSubpage<T> subpage = new PoolSubpage<T>(head, this, pageShifts, runOffset,
                                runSize(pageShifts, runHandle), elemSize);
 
+            // #5 由PoolChunk记录新创建的PoolSubpage，数组索引值是首页的偏移量，这个值是唯一的，也是记录在句柄值中
+            //    因此，在归还内存时会通过句柄值找到对应的PoolSubpge对象
             subpages[runOffset] = subpage;
+            // #6 委托PoolSubpage分配内存
             return subpage.allocate();
         }
     }
@@ -669,13 +691,20 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * @param handle handle to free
      */
     void free(long handle, int normCapacity, ByteBuffer nioBuffer) {
+        // 根据 handle 获取 run 的大小
         int runSize = runSize(pageShifts, handle);
+        // 更新被分配出去的字节数
         pinnedBytes -= runSize;
+
+        // 如果释放的是 Subpage，先进行 Subpage 级的释放。
         if (isSubpage(handle)) {
             int sizeIdx = arena.size2SizeIdx(normCapacity);
+            // 获取 Subpage 所在链表的头。
             PoolSubpage<T> head = arena.findSubpagePoolHead(sizeIdx);
 
+            // 获取 run 首页的偏移量，15位的值。
             int sIdx = runOffset(handle);
+            // 获取 Subpage。
             PoolSubpage<T> subpage = subpages[sIdx];
             assert subpage != null && subpage.doNotDestroy;
 
@@ -684,26 +713,34 @@ final class PoolChunk<T> implements PoolChunkMetric {
             synchronized (head) {
                 if (subpage.free(head, bitmapIdx(handle))) {
                     //the subpage is still used, do not free it
+                    // 如果 Subpage 还在被使用，只是释放 Subpage 里的小片空间，则直接返回。
                     return;
                 }
+                // 来到这里说明整个 Subpage 都不会再使用了，可以整个 Subpage 都清理掉。
+                // 而 Subpage 实质上就是一个 run。所以方法继续往下走，走释放 run 的流程。
                 assert !subpage.doNotDestroy;
                 // Null out slot in the array as it was freed and we should not use it anymore.
                 subpages[sIdx] = null;
             }
         }
 
+        // 释放 run 级。
         //start free run
         synchronized (runsAvail) {
-            // collapse continuous runs, successfully collapsed runs
-            // will be removed from runsAvail and runsAvailMap
+            // collapse continuous runs, successfully collapsed runs will be removed from runsAvail and runsAvailMap
+            // 瓦解连续的 run。成功瓦解的 run 将被将从 runsAvail 和 runsAvailMap 中删除
             long finalRun = collapseRuns(handle);
 
             //set run as not used
+            // 设置 run 为未使用
             finalRun &= ~(1L << IS_USED_SHIFT);
             //if it is a subpage, set it to run
+            // 如果是 subpage，则将其设置为 run（subpage 实质上也是一个 run）
             finalRun &= ~(1L << IS_SUBPAGE_SHIFT);
 
+            // 将回收的 run 记录到相应的地方以方便后续申请。
             insertAvailRun(runOffset(finalRun), runPages(finalRun), finalRun);
+            // 记录可用字节。
             freeBytes += runSize;
         }
 

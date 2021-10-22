@@ -2362,6 +2362,11 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * <p>
      * Also be aware that this method will NOT call {@link #retain()} and so the
      * reference count will NOT be increased.
+     * <p>
+     * 返回该缓冲区可读字节的一个片段。
+     * 修改返回的缓冲区或这个缓冲区的内容会影响彼此的内容，同时它们维护单独的索引和标记。
+     * 此方法与 buf.slice (buf.readerIndex () ，buf.readableBytes ()相同。
+     * 此方法不修改此缓冲区的 readerIndex 或 writerIndex。
      */
     public abstract ByteBuf slice();
 
@@ -2376,6 +2381,8 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * Note that this method returns a {@linkplain #retain() retained} buffer unlike {@link #slice()}.
      * This method behaves similarly to {@code slice().retain()} except that this method may return
      * a buffer implementation that produces less garbage.
+     * <p>
+     * 与 slice().retain() 行为一样
      */
     public abstract ByteBuf retainedSlice();
 

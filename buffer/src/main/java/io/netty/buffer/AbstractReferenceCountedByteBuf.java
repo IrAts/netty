@@ -22,6 +22,10 @@ import io.netty.util.internal.ReferenceCountUpdater;
 
 /**
  * Abstract base class for {@link ByteBuf} implementations that count references.
+ *
+ * 抽象类，实现与引用计数相关接口，内部使用 ReferenceCountUpdater 对象对变量  refCnt 进
+ * 行增/减操作，操作 refCnt 的唯一入口就是 updater 对象。内部实现还是比较简洁的，因为所有
+ * 的操作都委派给 ReferenceCountedByteBuf 对象来完成。
  */
 public abstract class AbstractReferenceCountedByteBuf extends AbstractByteBuf {
     /**
