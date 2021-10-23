@@ -20,6 +20,7 @@ import java.util.List;
 
 /**
  * Expose metrics for an arena.
+ * 定义与 PoolArena 相关监控接口。
  */
 public interface PoolArenaMetric extends SizeClassesMetric {
 

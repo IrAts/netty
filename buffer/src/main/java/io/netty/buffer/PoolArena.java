@@ -35,6 +35,19 @@ import static java.lang.Math.max;
  *      2.分配失败则委托 PoolArena 进行内存分配，PoolArena 最终还是委托 PoolChunk 进行内存分配。
  *      3.PoolChunk 根据内存规格采取不同的分配策略。
  *      4.内存回收时也是先通过本地线程缓存回收，如果实在回收不了或超出阈值，会交给关联的 PoolChunk 进行内存块回收。
+ *
+ *
+ * 首先我们要知道 PooledByteBufAllocator 是线程安全的类，我们可以通过 PooledByteBufAllocator.DEFAULT 获
+ * 得一个 io.netty.buffer.PooledByteBufAllocator 池化分配器，这也是 Netty 推荐的做法之一。我们也了解到，
+ * PooledByteBufAllocator 会初始两个重要的数组，分别是 heapArenas 和 directArenas，所有的与内存分配相关的
+ * 操作都会委托给 heapArenas 或 directArenas 处理，数组长度一般是通过 2*CPU_CORE 计算得到。这里体现 Netty
+ * （准确地说应该是 jemalloc 算法思想） 内存分配设计理念，通过增加多个 Arenas 减少内存竞争，提高在多线程环境下
+ * 分配内存的速度以及效率。数组 arenas 是由上面我们讲过的 PoolArena 对象构成，它是内存分配的中心枢纽，一位大管
+ * 家。包括管理 PoolChunk 对象、管理 PoolSubpage 对象、分配内存对象的核心逻辑、管理本地对象缓存池、内存池销毁
+ * 等等，它的侧重点在于管理已分配的内存对象。而 PoolChunk 是 jemalloc 算法思想的化身，它知道如何有效分配内存，
+ * 你只需要调用对应方法就能获取想要大小的内存块，它只专注管理物理内存这件事情，至于分配后的事情，它一概不知，也一
+ * 概不管，反正 PoolArena 这个大管家会操心的。
+ *
  */
 abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     static final boolean HAS_UNSAFE = PlatformDependent.hasUnsafe();
@@ -46,17 +59,60 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
 
     final PooledByteBufAllocator parent;
 
+    /**
+     * smallSubpagePools 数组的长度
+     */
     final int numSmallSubpagePools;
+    /**
+     * 指示分配直接内存时需要的对齐数。
+     * 如果是0则表示不要求地址对齐。
+     */
     final int directMemoryCacheAlignment;
+
+    /**
+     * 默认长度为39。这是因为被认为是 small 级别的size有 39 个。
+     * @see SizeClass
+     */
     private final PoolSubpage<T>[] smallSubpagePools;
 
-    private final PoolChunkList<T> q050;
-    private final PoolChunkList<T> q025;
-    private final PoolChunkList<T> q000;
+    // 任意 PoolChunkList 都有内存使用率的上下限: minUsage、maxUsage。如果使用率超过 maxUsage，那么
+    // PoolChunk 会从当前 PoolChunkList 移除，并移动到下一个PoolChunkList 。同理，如果使用率小于
+    // minUsage，那么 PoolChunk 会从当前 PoolChunkList 移除，并移动到前一个PoolChunkList。 每个
+    // PoolChunkList 的上下限都有交叉重叠的部分，因为 PoolChunk 需要在 PoolChunkList 不断移动，如果临界
+    // 值恰好衔接的，则会导致 PoolChunk 在两个 PoolChunkList 不断移动，造成性能损耗。 PoolChunkList 适用
+    // 于 Chunk 场景下的内存分配，PoolArena 初始化 6 个 PoolChunkList 并按上图首尾相连，形成双向链表，唯
+    // 独 q000 这个 PoolChunkList 是没有前向节点，是因为当其余 PoolChunkList 没有合适的 PoolChunk 可以分
+    // 配内存时，会创建一个新的 PoolChunk 放入 pInit 中，然后根据用户申请内存大小分配内存。而在 p000 中的
+    // PoolChunk ，如果因为内存归还的原因，使用率下降到 0%，则不需要放入 pInit，直接执行销毁方法，将整个
+    // 内存块的内存释放掉。这样，内存池中的内存就有生成/销毁等完成生命周期流程，避免了在没有使用情况下还占用内存。
+    /**
+     * 0~25%
+     */
     private final PoolChunkList<T> qInit;
+    /**
+     * 1~50%
+     */
+    private final PoolChunkList<T> q000;
+    /**
+     * 25~75%
+     */
+    private final PoolChunkList<T> q025;
+    /**
+     * 50~100%
+     */
+    private final PoolChunkList<T> q050;
+    /**
+     * 75~100%
+     */
     private final PoolChunkList<T> q075;
+    /**
+     * 100%
+     */
     private final PoolChunkList<T> q100;
 
+    /**
+     * 对上头6个 PoolChunkList 进行监控的工具列表。
+     */
     private final List<PoolChunkListMetric> chunkListMetrics;
 
     // Metrics for allocations and deallocations
@@ -114,6 +170,10 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         chunkListMetrics = Collections.unmodifiableList(metrics);
     }
 
+    /**
+     * 创建 PoolSubpage 链表的头结点head，head.next = head.prev = head;
+     * @return
+     */
     private PoolSubpage<T> newSubpagePoolHead() {
         PoolSubpage<T> head = new PoolSubpage<T>();
         head.prev = head;
@@ -121,6 +181,11 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         return head;
     }
 
+    /**
+     * 创建 size 大小的 PoolSubpage 数组。
+     * @param size
+     * @return
+     */
     @SuppressWarnings("unchecked")
     private PoolSubpage<T>[] newSubpagePoolArray(int size) {
         return new PoolSubpage[size];
@@ -128,16 +193,29 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
 
     abstract boolean isDirect();
 
+    /**
+     * 分配内存，分配 huge 级别以下的内存都会先尝试从线程本地缓存中分配，
+     * 当无法从线程本地中分配到内存时就到到 chunk 中分配。
+     *
+     * @param cache
+     * @param reqCapacity
+     * @param maxCapacity
+     * @return
+     */
     PooledByteBuf<T> allocate(PoolThreadCache cache, int reqCapacity, int maxCapacity) {
+        // 创建 PooledByteBuf，此时创建出来的 PooledByteBuf 是没有指向任何内存地址的，只是简单地设置了容量。
         PooledByteBuf<T> buf = newByteBuf(maxCapacity);
+        // 根据请求将足量的内存分配给 PooledByteBuf。
+        // 这个方法首先会尝试从本地线程缓存中分配内存，无法分配到内存时才到 chunk 中分配。
         allocate(cache, buf, reqCapacity);
         return buf;
     }
 
     /**
      * 按不同规格类型采用不同的内存分配策略.
+     * 除了huge级别的内存，都先尝试从线程本地缓存 PoolThreadCache 中分配，分配失败再进行实际的分配。
      *
-     * @param cache			本地线程缓存
+     * @param cache			当前线程的本地线程缓存
      * @param buf			ByteBuf对象，是byte[]或ByteBuffer的承载对象
      * @param reqCapacity	申请内存容量大小
      */
@@ -158,6 +236,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             int normCapacity = directMemoryCacheAlignment > 0
                     ? normalizeSize(reqCapacity) : reqCapacity;
             // Huge allocations are never served via the cache so just call allocateHuge
+            // 分配的 Huge 内存不会进行线程级别的缓存，所以直接申请就行了。
             allocateHuge(buf, normCapacity);
         }
     }
@@ -266,6 +345,18 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         allocationsHuge.increment();
     }
 
+    /**
+     * 当调用 ByteBuf#release() 会让引用计数 -1，当引用计数为 0 时就意味着该 ByteBuf
+     * 对象需要被回收，ByteBuf 对象进入对象池，ByteBuf 对象所管理的内存块进行内存池。但
+     * 是 PoolThreadCache 内存内存块进入内存池之前截胡了，把待回收内存块放入本地线程缓
+     * 存中，待后续本线程申请时使用。
+     *
+     * @param chunk
+     * @param nioBuffer
+     * @param handle
+     * @param normCapacity
+     * @param cache
+     */
     void free(PoolChunk<T> chunk, ByteBuffer nioBuffer, long handle, int normCapacity, PoolThreadCache cache) {
         if (chunk.unpooled) {
             int size = chunk.chunkSize();
@@ -274,8 +365,10 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             deallocationsHuge.increment();
         } else {
             SizeClass sizeClass = sizeClass(handle);
+            // 先让本地线程缓存尝试回收
             if (cache != null && cache.add(this, chunk, nioBuffer, handle, normCapacity, sizeClass)) {
                 // cached so not free it.
+                // 如果被缓存截胡了就直接返回，不执行真正的释放。
                 return;
             }
 
@@ -521,6 +614,14 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         return max(0, val);
     }
 
+    /**
+     * 返回一个池化的 PoolChunk 对象
+     * @param pageSize 页大小
+     * @param maxPageIdx
+     * @param pageShifts 看 {@link PoolChunk#pageShifts}
+     * @param chunkSize PoolChunk 的大小
+     * @return
+     */
     protected abstract PoolChunk<T> newChunk(int pageSize, int maxPageIdx, int pageShifts, int chunkSize);
     protected abstract PoolChunk<T> newUnpooledChunk(int capacity);
     protected abstract PooledByteBuf<T> newByteBuf(int maxCapacity);

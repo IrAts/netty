@@ -261,8 +261,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     /**
      * manage all subpages in this chunk.
-     * 这里每一个PoolSubPage代表了二叉树的一个叶节点，也就是说，当二
-     * 叉树叶节点内存被分配之后，其会使用一个PoolSubPage对其进行封装。
+     * 记录由本 chunk 生成的 PoolSubpage。
      */
     private final PoolSubpage<T>[] subpages;
 
@@ -687,6 +686,13 @@ final class PoolChunk<T> implements PoolChunkMetric {
      * Free a subpage or a run of pages When a subpage is freed from PoolSubpage, it might be added back to subpage pool
      * of the owning PoolArena. If the subpage pool in PoolArena has at least one other PoolSubpage of given elemSize,
      * we can completely free the owning Page so it is available for subsequent allocations
+     * <p>
+     * 这是对 subpage 和 run 回收的核心方法。对 subpage 回收是先回收到 PoolArena 对象的 subpage pool 池中，
+     * 如果发现此时的 PoolSubpage 已经没有被任何对象使用（numAvail == maxNumElems），它首先会从 subpage pool
+     * 池中移出，然后再按照 run 策略回收（因为此刻的 handle 记录着偏移量和 page 数量，所以完全有足够的回收信息）
+     * 。对于 run 回收，第一步会尝试不断向前合并相邻的空闲的 run，这一步会利用 runAvailMap 快速定位合适的 run，
+     * 若合并成功，会重新生成 handle 句柄值，接着再向后不断合并相邻的空闲的 run 并得到新的 handle，最后再更新
+     * {@link PoolChunk#runsAvail} 和 {@link PoolChunk#runsAvailMap} 两个数据结构，这样就完成了一次 run 的回收。
      *
      * @param handle handle to free
      */
@@ -698,19 +704,22 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
         // 如果释放的是 Subpage，先进行 Subpage 级的释放。
         if (isSubpage(handle)) {
+            // 根据容量大小获取index
             int sizeIdx = arena.size2SizeIdx(normCapacity);
-            // 获取 Subpage 所在链表的头。
+            // 获取 subpage pool 索引对应的链表的头结点（记住，PoolSubpage可是一个链表的结构）
+            // 我们可以把PoolArena中的PoolSubpage想象成一个大池子，这里面的PoolSubpage对象来自各个PoolChunk
             PoolSubpage<T> head = arena.findSubpagePoolHead(sizeIdx);
 
-            // 获取 run 首页的偏移量，15位的值。
+            // 获取 run 首页的偏移量，是一个15位的值。
             int sIdx = runOffset(handle);
-            // 获取 Subpage。
+            // 通过偏移量定位 PoolChunk 内部的 PoolSubpage，而这个PoolSubpage只属于PoolChunk
             PoolSubpage<T> subpage = subpages[sIdx];
             assert subpage != null && subpage.doNotDestroy;
 
             // Obtain the head of the PoolSubPage pool that is owned by the PoolArena and synchronize on it.
             // This is need as we may add it back and so alter the linked-list structure.
             synchronized (head) {
+                // 委托「PoolSubpage」释放内存
                 if (subpage.free(head, bitmapIdx(handle))) {
                     //the subpage is still used, do not free it
                     // 如果 Subpage 还在被使用，只是释放 Subpage 里的小片空间，则直接返回。
@@ -729,21 +738,24 @@ final class PoolChunk<T> implements PoolChunkMetric {
         synchronized (runsAvail) {
             // collapse continuous runs, successfully collapsed runs will be removed from runsAvail and runsAvailMap
             // 瓦解连续的 run。成功瓦解的 run 将被将从 runsAvail 和 runsAvailMap 中删除
+            // 即向前、后合并与当前run的pageOffset连续的run
             long finalRun = collapseRuns(handle);
 
             //set run as not used
-            // 设置 run 为未使用
+            // 更新「isUsed」标志位为 0
             finalRun &= ~(1L << IS_USED_SHIFT);
             //if it is a subpage, set it to run
-            // 如果是 subpage，则将其设置为 run（subpage 实质上也是一个 run）
+            // 如果先前handle表示的是subpage，则需要清除标志位
             finalRun &= ~(1L << IS_SUBPAGE_SHIFT);
 
+            // 更新 {@link PoolChunk#runsAvail} 和 {@link PoolChunk#runsAvailMap} 数据结构
             // 将回收的 run 记录到相应的地方以方便后续申请。
             insertAvailRun(runOffset(finalRun), runPages(finalRun), finalRun);
             // 记录可用字节。
             freeBytes += runSize;
         }
 
+        // 回收ByteBuffer对象
         if (nioBuffer != null && cachedNioBuffers != null &&
             cachedNioBuffers.size() < PooledByteBufAllocator.DEFAULT_MAX_CACHED_BYTEBUFFERS_PER_CHUNK) {
             cachedNioBuffers.offer(nioBuffer);
@@ -754,23 +766,38 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return collapseNext(collapsePast(handle));
     }
 
+    /**
+     * 向前合并连续的 run。
+     *
+     * @param handle
+     * @return
+     */
     private long collapsePast(long handle) {
+        // 不断向前合并，直到不能合并为止
         for (;;) {
+            // 获取要释放 run 的首页偏移量
             int runOffset = runOffset(handle);
+            // 获取要释放 run 的 page 数量
             int runPages = runPages(handle);
 
+            // 判断该 run 相连的前一个 run 是否已经被释放。
             long pastRun = getAvailRunByOffset(runOffset - 1);
             if (pastRun == -1) {
+                // 前一个相连的 run 没有被释放，也就是没办法将连续的空闲 run 合并，直接返回
                 return handle;
             }
+            // 来到此处说明相连的前一个 run 是空闲的
 
+            // 获取相连的前一个 run 的首页偏移量
             int pastOffset = runOffset(pastRun);
+            // 获取相连的前一个 run 的页数
             int pastPages = runPages(pastRun);
 
-            //is continuous
+            // 再一次判断是否是相连的: past的偏移量+页数量=run的偏移量
             if (pastRun != handle && pastOffset + pastPages == runOffset) {
-                //remove past run
+                // 溢出前一个相连的 run 的相关信息。
                 removeAvailRun(pastRun);
+                // 生成新的 handle 让连续的 run 合并起来管理
                 handle = toRunHandle(pastOffset, pastPages + runPages, 0);
             } else {
                 return handle;
@@ -778,6 +805,12 @@ final class PoolChunk<T> implements PoolChunkMetric {
         }
     }
 
+    /**
+     * 向后合并 run，原理和向前合并 run 类似。
+     *
+     * @param handle
+     * @return
+     */
     private long collapseNext(long handle) {
         for (;;) {
             int runOffset = runOffset(handle);

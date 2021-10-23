@@ -225,7 +225,7 @@ import static io.netty.buffer.PoolThreadCache.*;
  *   \                                      ↑           /                          ↑
  *    \                                  pageSize      /                        chunkSize
  *      —————————————————— Subpage ———————————————————
- *
+ *                           29个
  *
  *
  * <h3>SizeClasses#pageIdx2sizeTab</h3>

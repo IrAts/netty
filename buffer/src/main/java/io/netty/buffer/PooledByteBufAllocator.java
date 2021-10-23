@@ -370,13 +370,18 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
 
     @Override
     protected ByteBuf newHeapBuffer(int initialCapacity, int maxCapacity) {
+        // #1 从本地线程缓存中获取「PoolThreadCache」对象
+        //    如果是第一次获取，则会生成默认的。
         PoolThreadCache cache = threadCache.get();
+        // #2 从缓存对象中获取「heapArena」，根据存储类型不同选取对应的「Arena」
         PoolArena<byte[]> heapArena = cache.heapArena;
 
         final ByteBuf buf;
         if (heapArena != null) {
+            // #3-1 委托「heapArena」完成内存分配
             buf = heapArena.allocate(cache, initialCapacity, maxCapacity);
         } else {
+            // #3-2 兜底方案
             buf = PlatformDependent.hasUnsafe() ?
                     new UnpooledUnsafeHeapByteBuf(this, initialCapacity, maxCapacity) :
                     new UnpooledHeapByteBuf(this, initialCapacity, maxCapacity);
@@ -385,20 +390,29 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
         return toLeakAwareBuffer(buf);
     }
 
+    /**
+     * 获取一个堆外内存的「ByteBuf」对象
+     */
     @Override
     protected ByteBuf newDirectBuffer(int initialCapacity, int maxCapacity) {
+        // #1 从本地线程缓存中获取「PoolThreadCache」对象
+        //    如果是第一次获取，则会生成默认的。
         PoolThreadCache cache = threadCache.get();
+        // #2 从缓存对象中获取「directArena」，根据存储类型不同选取对应的「Arena」
         PoolArena<ByteBuffer> directArena = cache.directArena;
 
         final ByteBuf buf;
         if (directArena != null) {
+            // #3-1 委托「directArena」完成内存分配
             buf = directArena.allocate(cache, initialCapacity, maxCapacity);
         } else {
+            // #3-2 兜底方案
             buf = PlatformDependent.hasUnsafe() ?
                     UnsafeByteBufUtil.newUnsafeDirectByteBuf(this, initialCapacity, maxCapacity) :
                     new UnpooledDirectByteBuf(this, initialCapacity, maxCapacity);
         }
 
+        // #4 包装生成好的「ByteBuf」对象，用于内存泄漏检查
         return toLeakAwareBuffer(buf);
     }
 
@@ -497,6 +511,9 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
         threadCache.remove();
     }
 
+    /**
+     * 这玩意在初始化的时候就会将 heapArenas 和 directArena 设置好。
+     */
     final class PoolThreadLocalCache extends FastThreadLocal<PoolThreadCache> {
         private final boolean useCacheForAllThreads;
 
@@ -504,6 +521,10 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
             this.useCacheForAllThreads = useCacheForAllThreads;
         }
 
+        /**
+         * 每次初始化「FastThreadLocal」都会调用。
+         * 可以用来做一些初始化工作，在这里是初始化heapArena和directArena两个对象。
+         */
         @Override
         protected synchronized PoolThreadCache initialValue() {
             final PoolArena<byte[]> heapArena = leastUsedArena(heapArenas);
@@ -533,6 +554,13 @@ public class PooledByteBufAllocator extends AbstractByteBufAllocator implements 
             threadCache.free(false);
         }
 
+        /**
+         * 比较每个PoolArena的numThreadCaches的值，选择最小的那个与线程进行绑定。
+         *
+         * @param arenas
+         * @param <T>
+         * @return
+         */
         private <T> PoolArena<T> leastUsedArena(PoolArena<T>[] arenas) {
             if (arenas == null || arenas.length == 0) {
                 return null;

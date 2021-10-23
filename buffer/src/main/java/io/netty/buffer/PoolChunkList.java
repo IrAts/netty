@@ -27,19 +27,33 @@ import static java.lang.Math.*;
 
 import java.nio.ByteBuffer;
 
+/**
+ * PoolChunkList 是一个双向链表，用来存储 PoolChunk 对象，它指向 PoolChunk 链表的头结点。
+ * 而对于 PoolChunkList 节点本身来说，它与其他 PoolChunkList 也构成一个双向链表。
+ *
+ * @param <T>
+ */
 final class PoolChunkList<T> implements PoolChunkListMetric {
+    // 当内存元素为 null 时就返回这个空的迭代器，可以减少空判断
     private static final Iterator<PoolChunkMetric> EMPTY_METRICS = Collections.<PoolChunkMetric>emptyList().iterator();
+    // PoolChunkList 是由 PoolArena 所管理的，所以持有"管理者"的引用
     private final PoolArena<T> arena;
+    // PoolChunkList 和其他的 PoolChunkList 也会构成双向链表结构
     private final PoolChunkList<T> nextList;
+    // This is only update once when create the linked like list of PoolChunkList in PoolArena constructor.
+    private PoolChunkList<T> prevList;
+    // 允许存在于当前 PoolChunkList 中的 PoolChunk 的最小内存使用率
     private final int minUsage;
+    // 允许存在于当前 PoolChunkList 中的 PoolChunk 的最大内存使用率
     private final int maxUsage;
+    // 一个 PoolChunk 此时所对应最高可分配的内存大小，根据 minUsage 计算得到该值
+    // 比如当 minUsage=75%。计算公式为：chunkSize * (100% - minUsage) = chunkSize * 25% = 4MB
     private final int maxCapacity;
+    // PoolChunkList 内部的 PoolChunk 也是一个双向链表。指向 PoolChunkl 链表的头结点。
     private PoolChunk<T> head;
     private final int freeMinThreshold;
     private final int freeMaxThreshold;
 
-    // This is only update once when create the linked like list of PoolChunkList in PoolArena constructor.
-    private PoolChunkList<T> prevList;
 
     // TODO: Test if adding padding helps under contention
     //private long pad0, pad1, pad2, pad3, pad4, pad5, pad6, pad7;

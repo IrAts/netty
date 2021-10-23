@@ -125,6 +125,8 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
     }
 
     /**
+     *
+     *
      * @return {@code true} if this subpage is in use.
      *         {@code false} if this subpage is not used by its chunk and thus it's OK to be released.
      */
