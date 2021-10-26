@@ -2349,6 +2349,9 @@ public abstract class ByteBuf implements ReferenceCounted, Comparable<ByteBuf> {
      * the returned buffer or this buffer does not affect each other at all.
      * This method does not modify {@code readerIndex} or {@code writerIndex} of
      * this buffer.
+     * <p>
+     * 返回当前 buffer 的一个子区域拷贝，返回的新 buffer 与当前
+     * buffer 是完全独立的。修改其中一个 buffer 的内容并不会影响另一个。
      */
     public abstract ByteBuf copy(int index, int length);
 

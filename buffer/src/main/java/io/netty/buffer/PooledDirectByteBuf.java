@@ -25,6 +25,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+/**
+ * PooledDirectByteBuf 基于内存池实现，与 UnPooledDirectByteBuf
+ * 唯一不同的就是缓冲区的分配和销毁策略不同，其他功能都是等同的。
+ *
+ */
 final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
     private static final ObjectPool<PooledDirectByteBuf> RECYCLER = ObjectPool.newPool(
@@ -35,6 +40,13 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
         }
     });
 
+    /**
+     * 由于采用内存池实现，所以新创建 PooledDirectByteBuf
+     * 对象是不能直接 new 一个实例，而是从内存池中获取。
+     *
+     * @param maxCapacity
+     * @return
+     */
     static PooledDirectByteBuf newInstance(int maxCapacity) {
         PooledDirectByteBuf buf = RECYCLER.get();
         buf.reuse(maxCapacity);
@@ -279,10 +291,21 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
         return readBytes;
     }
 
+
+    /**
+     * @see ByteBuf#copy(int, int)
+     * 
+     * @param index
+     * @param length
+     * @return
+     */
     @Override
     public ByteBuf copy(int index, int length) {
+        // 校验长度
         checkIndex(index, length);
+        // 申请新的缓冲区
         ByteBuf copy = alloc().directBuffer(length, maxCapacity());
+        // 复制内容
         return copy.writeBytes(this, index, length);
     }
 
