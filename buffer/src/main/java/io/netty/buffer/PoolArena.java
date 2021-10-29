@@ -30,23 +30,24 @@ import static io.netty.buffer.PoolChunk.isSubpage;
 import static java.lang.Math.max;
 
 /**
+ * <pre>
  * Netty 分配内存的逻辑是和 jemalloc3 大致相同：
- *      1.首先尝试从本地缓存中分配，分配成功则返回。
- *      2.分配失败则委托 PoolArena 进行内存分配，PoolArena 最终还是委托 PoolChunk 进行内存分配。
- *      3.PoolChunk 根据内存规格采取不同的分配策略。
- *      4.内存回收时也是先通过本地线程缓存回收，如果实在回收不了或超出阈值，会交给关联的 PoolChunk 进行内存块回收。
- *
+ *     1.首先尝试从本地缓存中分配，分配成功则返回。
+ *     2.分配失败则委托 PoolArena 分配内存，PoolArena 最终还是委托 PoolChunk 进行内存分配。
+ *     3.PoolChunk 根据内存规格采取不同的分配策略。
+ *     4.内存回收时也是先通过本地线程缓存回收，如果实在回收不了或超出阈值，会交给关联的 PoolChunk 进行内存块回收。
+ * </pre>
  *
  * 首先我们要知道 PooledByteBufAllocator 是线程安全的类，我们可以通过 PooledByteBufAllocator.DEFAULT 获
  * 得一个 io.netty.buffer.PooledByteBufAllocator 池化分配器，这也是 Netty 推荐的做法之一。我们也了解到，
  * PooledByteBufAllocator 会初始两个重要的数组，分别是 heapArenas 和 directArenas，所有的与内存分配相关的
  * 操作都会委托给 heapArenas 或 directArenas 处理，数组长度一般是通过 2*CPU_CORE 计算得到。这里体现 Netty
  * （准确地说应该是 jemalloc 算法思想） 内存分配设计理念，通过增加多个 Arenas 减少内存竞争，提高在多线程环境下
- * 分配内存的速度以及效率。数组 arenas 是由上面我们讲过的 PoolArena 对象构成，它是内存分配的中心枢纽，一位大管
- * 家。包括管理 PoolChunk 对象、管理 PoolSubpage 对象、分配内存对象的核心逻辑、管理本地对象缓存池、内存池销毁
- * 等等，它的侧重点在于管理已分配的内存对象。而 PoolChunk 是 jemalloc 算法思想的化身，它知道如何有效分配内存，
- * 你只需要调用对应方法就能获取想要大小的内存块，它只专注管理物理内存这件事情，至于分配后的事情，它一概不知，也一
- * 概不管，反正 PoolArena 这个大管家会操心的。
+ * 分配内存的速度以及效率。数组 arenas 是由 PoolArena 对象构成，它是内存分配的中心枢纽，一位大管家。包括管理
+ * PoolChunk 对象、管理 PoolSubpage 对象、分配内存对象的核心逻辑、管理本地对象缓存池、内存池销毁等等，它的侧
+ * 重点在于管理已分配的内存对象。而 PoolChunk 是 jemalloc 算法思想的化身，它知道如何有效分配内存，你只需要调
+ * 用对应方法就能获取想要大小的内存块，它只专注管理物理内存这件事情，至于分配后的事情，它一概不知，也一概不管，
+ * 反正 PoolArena 这个大管家会操心的。
  *
  */
 abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
@@ -70,8 +71,10 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     final int directMemoryCacheAlignment;
 
     /**
-     * 默认长度为39。这是因为被认为是 small 级别的size有 39 个。
-     * @see SizeClass
+     * 默认长度为39。这是因为被认为是 small 级别的size有 39 个。{@link SizeClasses 为什么是39?}
+     * 数组中的每个元素对应于每个不同大小级别的 PoolSubpage 链表（PoolSubpage 将一片连续的内存分为多个等大的块）。
+     * 如 smallSubpagePools[0] 表示 16B 大小级别的 PoolSubpage 链表。
+     * 而 smallSubpagePools[38] 表示 28KB 大小界别的 PoolSubpage 链表。
      */
     private final PoolSubpage<T>[] smallSubpagePools;
 
@@ -115,25 +118,61 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
      */
     private final List<PoolChunkListMetric> chunkListMetrics;
 
-    // Metrics for allocations and deallocations
+    /**
+     * Metrics for allocations and deallocations.
+     * PoolArena 成功分配 Normal 级别内存的次数（不包含本地缓存分配的次数）
+     */
     private long allocationsNormal;
-    // We need to use the LongCounter here as this is not guarded via synchronized block.
+    /**
+     * PoolArena 成功分配 Small 级别内存的次数（不包含本地缓存分配的次数）
+     */
     private final LongCounter allocationsSmall = PlatformDependent.newLongCounter();
+    /**
+     * PoolArena 成功分配 Huge 级别内存的次数（Huge 级别的内存不能进行本地缓存）
+     */
     private final LongCounter allocationsHuge = PlatformDependent.newLongCounter();
+    /**
+     * PoolArena 成功分配 Huge 级别内存的总大小（Huge 级别的内存不能进行本地缓存）
+     */
     private final LongCounter activeBytesHuge = PlatformDependent.newLongCounter();
 
+    /**
+     * 已经回收 Small 级别内存的次数
+     */
     private long deallocationsSmall;
+    /**
+     * 已经回收 Normal 级别内存的次数
+     */
     private long deallocationsNormal;
-
-    // We need to use the LongCounter here as this is not guarded via synchronized block.
+    /**
+     * We need to use the LongCounter here as this is not guarded via synchronized block.
+     * 已经回收 Huge 级别内存的次数。
+     */
     private final LongCounter deallocationsHuge = PlatformDependent.newLongCounter();
 
-    // Number of thread caches backed by this arena.
+    /**
+     * Number of thread caches backed by this arena.
+     * 用来存储存在多少个线程使用当前对象进行内存分配。
+     */
     final AtomicInteger numThreadCaches = new AtomicInteger();
 
     // TODO: Test if adding padding helps under contention
     //private long pad0, pad1, pad2, pad3, pad4, pad5, pad6, pad7;
 
+    /**
+     * <ol>
+     * <li> 初始化计数值、辅助值
+     * <li> 初始化{@link #smallSubpagePools}
+     * <li> 初始化 PoolChunkList：{@link #q100}、{@link #q075}、{@link #q050}、{@link #q025}、{@link #q000}、{@link #qInit}
+     * <li> 将第三步初始化好的 PoolChunkList 进行连接，形成一个双向链表
+     * <li> 将第三步初始化好的 PoolChunkList 放入到监控列表进行性能监测
+     * </ol>
+     * @param parent 当前的 PoolArena 归属的 PooledByteBufAllocator。
+     * @param pageSize page 的大小，默认8KB
+     * @param pageShifts page 大小的偏移量，默认值为13 (1 << 13 == 8KB)
+     * @param chunkSize chunk 的大小
+     * @param cacheAlignment 内存块的对齐量
+     */
     protected PoolArena(PooledByteBufAllocator parent, int pageSize,
           int pageShifts, int chunkSize, int cacheAlignment) {
         super(pageSize, pageShifts, chunkSize, cacheAlignment);
@@ -172,7 +211,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
 
     /**
      * 创建 PoolSubpage 链表的头结点head，head.next = head.prev = head;
-     * @return
+     * 这个方法会在 PoolArena 构造的时候调用，对 {@link #smallSubpagePools} 初始化头节点。
      */
     private PoolSubpage<T> newSubpagePoolHead() {
         PoolSubpage<T> head = new PoolSubpage<T>();
@@ -183,6 +222,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
 
     /**
      * 创建 size 大小的 PoolSubpage 数组。
+     * 这个方法会在 PoolArena 构建的时候调用，以生成 {@link #smallSubpagePools} 数组。
      * @param size
      * @return
      */

@@ -225,7 +225,7 @@ import static io.netty.buffer.PoolThreadCache.*;
  *   \                                      ↑           /                          ↑
  *    \                                  pageSize      /                        chunkSize
  *      —————————————————— Subpage ———————————————————
- *                           29个
+ *                           39个
  *
  *
  * <h3>SizeClasses#pageIdx2sizeTab</h3>
@@ -328,9 +328,30 @@ abstract class SizeClasses implements SizeClassesMetric {
         size2idxTab(size2idxTab);
     }
 
+    /**
+     * 记录了每个叶节点内存的大小，默认为8192，即8KB
+     */
     protected final int pageSize;
+    /**
+     * <pre>
+     * 值为13。
+     * 该值可用于计算一个 run 中有多少个 page ，或者计算n个 page 的大小是多少字节。
+     * 我们知道一个 run 包含多个 page，即 runSize 必然为 pageSize 的整数倍。
+     * 又由于一个 pageSize 的默认为8192(8Kib)，是2的幂次方，pageSize对应的位图为：
+     *     0000 0000 0000 0000 0010 0000 0000 0000 == 1 << 13
+     * 故通过 page 个数计算 runSize 或者通过 runSize 计算 page 个数时可使用位操作。
+     *     通过 page 个数计算 runSize ：runSize = n << pageShifts
+     *     通过 runSize 计算 page 个数：n = runSize >> pageShifts
+     */
     protected final int pageShifts;
+    /**
+     * 记录了当前整个PoolChunk申请的内存大小，默认为16M
+     */
     protected final int chunkSize;
+    /**
+     * 指示分配直接内存时需要的对齐数。
+     * 如果是0则表示不要求地址对齐。
+     */
     protected final int directMemoryCacheAlignment;
 
     final int nSizes;
