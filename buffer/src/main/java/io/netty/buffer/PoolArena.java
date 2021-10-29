@@ -281,9 +281,25 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         }
     }
 
+    /**
+     * 分配 Small 级别的内存块，分配的内存块会被 buf 持有。
+     * <ol>
+     * <li>尝试从线程本地缓存中分配，分配成功则直接返回。
+     * <li>获取要分配的 PoolSubpage 链表。
+     * <li>如果 PoolSubpage 链表只有一个节点，那么分配一个新节点接入到链表中。（头节点不会被用于内存分配！）
+     * <li>使用 PoolSubpage 链表的第二个节点进行内存分配。
+     * <li>记录分配次数
+     *
+     * </ol>
+     * @param cache 线程本地缓存
+     * @param buf 容器，用来装载被分配的内存块的指针
+     * @param reqCapacity 实际申请的内存，如 1000 byte
+     * @param sizeIdx 一个下标索引，该下标指向大于等于 reqCapacity 的最小二次幂值。如：reqCapacity = 1000，sizeIdx = 19，size[sizeIdx] = 1024;
+     */
     private void tcacheAllocateSmall(PoolThreadCache cache, PooledByteBuf<T> buf, final int reqCapacity,
                                      final int sizeIdx) {
 
+        // 尝试从 cache 中分配内存。
         if (cache.allocateSmall(this, buf, reqCapacity, sizeIdx)) {
             // was able to allocate out of the cache so move on
             return;
@@ -297,7 +313,9 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         final boolean needsNormalAllocation;
         synchronized (head) {
             final PoolSubpage<T> s = head.next;
+            // 如果 smallSubpagePools[sizeIdx] 链表里只有一个元素则为true。
             needsNormalAllocation = s == head;
+            // 如果 smallSubpagePools[sizeIdx] 链表含有多个元素，直接使用第二个元素进行内存分配。
             if (!needsNormalAllocation) {
                 assert s.doNotDestroy && s.elemSize == sizeIdx2size(sizeIdx);
                 long handle = s.allocate();
@@ -306,6 +324,8 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             }
         }
 
+        // 如果 smallSubpagePools[sizeIdx] 链表里只有一个元素则为true，则分配一个新的节点进行内存分配。
+        // smallSubpagePools[sizeIdx] 链表的头结点永远不会被用于内存分配。
         if (needsNormalAllocation) {
             synchronized (this) {
                 allocateNormal(buf, reqCapacity, sizeIdx, cache);
@@ -378,6 +398,12 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         allocationsSmall.increment();
     }
 
+    /**
+     * 分配 Huge 级别的内存块，Huge 级别的内存块都是非池化的。
+     *
+     * @param buf
+     * @param reqCapacity
+     */
     private void allocateHuge(PooledByteBuf<T> buf, int reqCapacity) {
         PoolChunk<T> chunk = newUnpooledChunk(reqCapacity);
         activeBytesHuge.add(chunk.chunkSize());
@@ -386,10 +412,11 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
     }
 
     /**
-     * 当调用 ByteBuf#release() 会让引用计数 -1，当引用计数为 0 时就意味着该 ByteBuf
-     * 对象需要被回收，ByteBuf 对象进入对象池，ByteBuf 对象所管理的内存块进行内存池。但
-     * 是 PoolThreadCache 内存内存块进入内存池之前截胡了，把待回收内存块放入本地线程缓
-     * 存中，待后续本线程申请时使用。
+     * <ol>
+     * <li>如果要释放的内存块是非池化的，那么直接回收（仅当内存块为 Huge 级别时才是非池化的）。
+     * <li>池化的内存在真正被 PoolArena 回收前会给机会 cache 来尝试进行本地缓存内存块。
+     * <li>如果 cache 没有将内存块进行本地缓存，那么久执行实际的回收逻辑。
+     * </ol>
      *
      * @param chunk
      * @param nioBuffer
@@ -404,6 +431,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
             activeBytesHuge.add(-size);
             deallocationsHuge.increment();
         } else {
+            // 获取要释放的内存块的大小级别
             SizeClass sizeClass = sizeClass(handle);
             // 先让本地线程缓存尝试回收
             if (cache != null && cache.add(this, chunk, nioBuffer, handle, normCapacity, sizeClass)) {
@@ -411,7 +439,6 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
                 // 如果被缓存截胡了就直接返回，不执行真正的释放。
                 return;
             }
-
             freeChunk(chunk, handle, normCapacity, sizeClass, nioBuffer, false);
         }
     }
@@ -420,6 +447,16 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         return isSubpage(handle) ? SizeClass.Small : SizeClass.Normal;
     }
 
+    /**
+     * 释放 chunk。
+     *
+     * @param chunk
+     * @param handle
+     * @param normCapacity
+     * @param sizeClass
+     * @param nioBuffer
+     * @param finalizer
+     */
     void freeChunk(PoolChunk<T> chunk, long handle, int normCapacity, SizeClass sizeClass, ByteBuffer nioBuffer,
                    boolean finalizer) {
         final boolean destroyChunk;
