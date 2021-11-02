@@ -483,10 +483,23 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         }
     }
 
+    /**
+     * 获取用来存放 sizeIdx 对应大小的 PoolSubpage 链表的头结点
+     *
+     * @param sizeIdx
+     * @return
+     */
     PoolSubpage<T> findSubpagePoolHead(int sizeIdx) {
         return smallSubpagePools[sizeIdx];
     }
 
+    /**
+     * 为 buf 重新分配缓冲区，并将 buf 的旧内容复制到新的缓冲区中。
+     *
+     * @param buf
+     * @param newCapacity
+     * @param freeOldMemory
+     */
     void reallocate(PooledByteBuf<T> buf, int newCapacity, boolean freeOldMemory) {
         assert newCapacity >= 0 && newCapacity <= buf.maxCapacity();
 
