@@ -26,13 +26,33 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.GatheringByteChannel;
 import java.nio.channels.ScatteringByteChannel;
 
+/**
+ * 池化的 ByteBuf。
+ *
+ *
+ *
+ */
 abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
 
+    /**
+     * Handle 是可回收对象的回收凭证。根据此凭证可以追溯出生产该对象的线程池。
+     */
     private final Handle<PooledByteBuf<T>> recyclerHandle;
 
+    /**
+     * 本 ByteBuf 所持有的字节数组来源于该 chunk。
+     */
     protected PoolChunk<T> chunk;
+    /**
+     * 本 ByteBuf 所持有的字节数组的句柄，通过句柄可计算出该数组的开始位置、长度等信息 。
+     */
     protected long handle;
+    /**
+     * 如果该 ByteBuf 是基于 Heap Memory 的，那么直接这里的类型为：byte[]。
+     * 如果该 ByteBuf 是基于 Direct Memory 的，那么直接这里的类型为：ByteBuffer。
+     */
     protected T memory;
+
     protected int offset;
     protected int length;
     int maxLength;
@@ -40,6 +60,9 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
     ByteBuffer tmpNioBuf;
     private ByteBufAllocator allocator;
 
+    /**
+     * 这是一个可回收对象，持有 Handle 没毛病。
+     */
     @SuppressWarnings("unchecked")
     protected PooledByteBuf(Handle<? extends PooledByteBuf<T>> recyclerHandle, int maxCapacity) {
         super(maxCapacity);
@@ -55,6 +78,11 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
         init0(chunk, null, 0, 0, length, length, null);
     }
 
+    /**
+     * 初始化方法，设置：
+     * {@link #chunk}、{@link #memory}、{@link #tmpNioBuf}、{@link #allocator}、
+     * {@link #cache}、{@link #handle}、{@link #offset}、{@link #length}、{@link #maxLength}
+     */
     private void init0(PoolChunk<T> chunk, ByteBuffer nioBuffer,
                        long handle, int offset, int length, int maxLength, PoolThreadCache cache) {
         assert handle >= 0;
@@ -73,11 +101,17 @@ abstract class PooledByteBuf<T> extends AbstractReferenceCountedByteBuf {
 
     /**
      * Method must be called before reuse this {@link PooledByteBufAllocator}
+     * <br/>
+     * 在重用这个 PooledByteBufAllocator 之前，必须调用这个方法来重置状态。
      */
     final void reuse(int maxCapacity) {
+        // 设置最大容量
         maxCapacity(maxCapacity);
+        // 重置引用计数
         resetRefCnt();
+        // 重置读写索引
         setIndex0(0, 0);
+        // 重置读写mark标记
         discardMarks();
     }
 

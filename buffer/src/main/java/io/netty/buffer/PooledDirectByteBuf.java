@@ -42,10 +42,8 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
 
     /**
      * 由于采用内存池实现，所以新创建 PooledDirectByteBuf
-     * 对象是不能直接 new 一个实例，而是从内存池中获取。
-     *
-     * @param maxCapacity
-     * @return
+     * 对象是不能直接 new 一个实例，而是从内存池中获取，如果
+     * 内存池中没有的话内存池会执行创建。
      */
     static PooledDirectByteBuf newInstance(int maxCapacity) {
         PooledDirectByteBuf buf = RECYCLER.get();
@@ -53,10 +51,20 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
         return buf;
     }
 
+    /**
+     * {@link PooledDirectByteBuf} 是一个可回收对象，所以需要持有一个回收凭证 Handle。
+     * Handle 中可以获取到生产这个对象的新城的内存池。
+     */
     private PooledDirectByteBuf(Handle<PooledDirectByteBuf> recyclerHandle, int maxCapacity) {
         super(recyclerHandle, maxCapacity);
     }
 
+    /**
+     * 对入参 {@code #memory} 进行克隆并返回新的 ByteBuffer。
+     * 入参的 ByteBuffer 和新产生的 ByteBuffer 在底层共享一个
+     * 字节数组，任意一方修改底层字节数组都会被另一方观察到。虽然
+     * 共享同一个底层字节数组，但是这两个缓冲区独立维护指针。
+     */
     @Override
     protected ByteBuffer newInternalNioBuffer(ByteBuffer memory) {
         return memory.duplicate();
@@ -292,13 +300,6 @@ final class PooledDirectByteBuf extends PooledByteBuf<ByteBuffer> {
     }
 
 
-    /**
-     * @see ByteBuf#copy(int, int)
-     * 
-     * @param index
-     * @param length
-     * @return
-     */
     @Override
     public ByteBuf copy(int index, int length) {
         // 校验长度

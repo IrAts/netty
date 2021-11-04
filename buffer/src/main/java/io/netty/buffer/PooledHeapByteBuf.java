@@ -34,12 +34,22 @@ class PooledHeapByteBuf extends PooledByteBuf<byte[]> {
         }
     });
 
+    /**
+     * 由于采用内存池实现，所以新创建 PooledHeapByteBuf
+     * 对象是不能直接 new 一个实例，而是从内存池中获取，如果
+     * 内存池中没有的话内存池会执行创建。
+     */
     static PooledHeapByteBuf newInstance(int maxCapacity) {
         PooledHeapByteBuf buf = RECYCLER.get();
+        // 重置buf的状态
         buf.reuse(maxCapacity);
         return buf;
     }
 
+    /**
+     * {@link PooledHeapByteBuf} 是一个可回收对象，所以需要持有一个回
+     * 收凭证 Handle。Handle 中可以获取到生产这个对象的新城的内存池。
+     */
     PooledHeapByteBuf(Handle<? extends PooledHeapByteBuf> recyclerHandle, int maxCapacity) {
         super(recyclerHandle, maxCapacity);
     }
