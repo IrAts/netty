@@ -910,10 +910,23 @@ final class PoolChunk<T> implements PoolChunkMetric {
         return (int) (handle >> RUN_OFFSET_SHIFT);
     }
 
+    /**
+     * 计算 handle 所指向的 run 有多少字节。
+     *
+     * @param pageShifts 详情见 {@link #pageShifts}
+     * @param handle 内存句柄
+     * @return 字节数
+     */
     static int runSize(int pageShifts, long handle) {
         return runPages(handle) << pageShifts;
     }
 
+    /**
+     * 计算 handle 所指向的 run 有多少个 page。
+     *
+     * @param handle 内存句柄
+     * @return page 数
+     */
     static int runPages(long handle) {
         return (int) (handle >> SIZE_SHIFT & 0x7fff);
     }

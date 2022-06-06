@@ -22,22 +22,54 @@ import static io.netty.buffer.PoolChunk.IS_USED_SHIFT;
 import static io.netty.buffer.PoolChunk.IS_SUBPAGE_SHIFT;
 import static io.netty.buffer.SizeClasses.LOG2_QUANTUM;
 
+/**
+ * PoolSubpage 用于 Small 级别的内存申请，该级别的内存块大小有一个特点：不一定是 pageSize 的倍数。
+ * 但 PoolChunk 每次都会返回一个 run（多个page的集合）。为了管理内存方便，当申请 PoolSubpage 的时
+ * 候，会计算所申请的 small 级别的内存与 pageSize 的最小公倍数，然后从 PoolChunk 中获取到一个 run。
+ * 再将获取到的 run 分为多个 small 大小的内存块用于分配。
+ *
+ * 故：
+ * 一个 PoolSubpage 其实对应一个 run，该 run 被分裂成 numAvail 个 elemSize 的 small 级别的内存块。
+ * 每次 small 级别的内存块，numAvail 就会减一，直到 numAvail == 0 时，即 PoolSubpage 被分配完毕。
+ *
+ */
 final class PoolSubpage<T> implements PoolSubpageMetric {
 
+    /**
+     * 标识当前 PoolSubpage 所申请的内存所来源于的 PoolChunk。
+     */
     final PoolChunk<T> chunk;
+    /**
+     * 详见 {@link PoolChunk#pageShifts}
+     */
     private final int pageShifts;
+    /**
+     * 当前 PoolSubpage 所申请内存的开始偏移地址。
+     */
     private final int runOffset;
+    /**
+     * 当前 PoolSubpage 所申请内存的总字节数。
+     */
     private final int runSize;
+    /**
+     * 每一个bit用来标识当前 PoolSubpage 所持有的每一个字节的使用情况。
+     */
     private final long[] bitmap;
 
     PoolSubpage<T> prev;
     PoolSubpage<T> next;
 
     boolean doNotDestroy;
+    /**
+     * 当前 PoolSubpage 所能分配的 small 级别内存块的大小。
+     */
     int elemSize;
     private int maxNumElems;
     private int bitmapLength;
     private int nextAvail;
+    /**
+     * 当前 PoolSubpage 还能分配多少个 elemSize 大小的 small 级别的内存块。
+     */
     private int numAvail;
 
     // TODO: Test if adding padding helps under contention
