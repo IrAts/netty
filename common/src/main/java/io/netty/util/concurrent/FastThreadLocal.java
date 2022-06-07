@@ -74,8 +74,11 @@ public class FastThreadLocal<V> {
      * 而这里是类加载的时候就调用了，那就说明这个肯定为0。
      *
      * 在 InternalThreadLocalMap 用非静态的 Object[] 成员变量 indexedVariables 来存储各个 FastThreadLocal
-     * 对应的值。但是唯独0位置是
+     * 对应的值。但是唯独0位置用于存放一个set，该set用于记录当前线程所有的 FastThreadLocal ，方便清空该线程的
+     * InternalThreadLocalMap 时更加迅速。
      *
+     * 在 {@link FastThreadLocal#removeAll} 方法中，可以看到从 variablesToRemoveIndex 位置获取到当前线程的
+     * Set<FastThreadLocal>，然后遍历该Set从 InternalThreadLocalMap 中清掉变量。
      */
     private static final int variablesToRemoveIndex = InternalThreadLocalMap.nextVariableIndex();
 
