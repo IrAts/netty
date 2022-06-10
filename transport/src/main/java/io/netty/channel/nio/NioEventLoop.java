@@ -507,7 +507,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                 try {
                     // 在默认的 selectStrategy 实现中。
                     // 如果 hasTasks() 返回 true，则该方法里面会潜在的调用一次非阻塞方法 selector.selectorNow()。返回的 strategy 为 selector.selectorNow() 的返回值。
-                    // 如果 hasTasks() 返回 false, 则该方法的返回值 SelectStrategy.SELECT。
+                    // 如果 hasTasks() 返回 false, 则该方法的返回值 SelectStrategy.SELECT = -1。
                     // 采取这样策略的原因如下：
                     // 如果 hasTasks() 返回 true，则说明当前存在异步任务需要处理，不能阻塞等待IO事件的到达。但是也不能不理睬以及在等待接受的IO事件，所以就调用一次selectorNow()。
                     // 而如果 hasTasks() 返回 false，则说明当前 EventLoop 比较空闲，可以阻塞等待IO事件的到达。
@@ -521,7 +521,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         // 由于NIO不支持忙等待，所以切换到SELECT。
 
                     case SelectStrategy.SELECT:
-                        // 获取下一个最接近的下一个定时人物的执行事件，如果返回-1则表示没有定时任务
+                        // 获取下一个最接近的下一个定时任务的执行时间，如果返回-1则表示没有定时任务
                         long curDeadlineNanos = nextScheduledTaskDeadlineNanos();
                         if (curDeadlineNanos == -1L) {
                             curDeadlineNanos = NONE; // nothing on the calendar
