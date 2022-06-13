@@ -254,6 +254,41 @@ import java.util.NoSuchElementException;
  * 比如在 STARTTLS 协议被请求时，可以简单地通过向 ChannelPipeline 添加一个适当的 ChannelHandler（SslHandler）来按需地支持 STARTTLS 协议。
  *
  *
+ * <h1>netty的Pipeline模型</h1>
+ * netty的Pipeline模型用的是责任链设计模式，当boss线程监控到绑定端口上有accept事件，此时会为该socket连接实例化Pipeline，
+ * 并将InboundHandler和OutboundHandler按序加载到Pipeline中，然后将该socket连接（也就是Channel对象）挂载到selector上。
+ * 一个selector对应一个线程，该线程会轮询所有挂载在他身上的socket连接有没有read或write事件，然后通过线程池去执行Pipeline
+ * 的业务流。selector如何查询哪些socket连接有read或write事件，主要取决于调用操作系统的哪种IO多路复用内核，如果是select
+ * （注意，此处的select是指操作系统内核的select IO多路复用，不是netty的seletor对象），那么将会遍历所有socket连接，依次询
+ * 问是否有read或write事件，最终操作系统内核将所有IO事件的socket连接返回给netty进程，当有很多socket连接时，这种方式将会大
+ * 大降低性能，因为存在大量socket连接的遍历和内核内存的拷贝。如果是epoll，性能将会大幅提升，因为他基于完成端口事件，已经维护
+ * 好有IO事件的socket连接列表，selector直接取走，无需遍历，也少掉内核内存拷贝带来的性能损耗。
+ *
+ * Pipeline的责任链是通过ChannelHandlerContext对象串联的，ChannelHandlerContext对象里封装了ChannelHandler对象，
+ * 通过prev和next节点实现双向链表。Pipeline的首尾节点分别是head和tail，当selector轮询到socket有read事件时，将会触发
+ * Pipeline责任链，从head开始调起第一个InboundHandler的ChannelRead事件，接着通过fire方法依次触发Pipeline上的下一个
+ * ChannelHandler，而该事件是否继续传给下一个ChannelHandler则取决于当前ChannelHandler是否调用fire方法。。
+ *
+ * ChannelHandler分为InbounHandler和OutboundHandler，InboundHandler用来处理接收消息，OutboundHandler用来处理发
+ * 送消息。head的ChannelHandler既是InboundHandler又是OutboundHandler，无论是read还是write都会经过head，所以head
+ * 封装了unsafe方法，用来操作socket的read和write。tail的ChannelHandler只是InboundHandler，read的Pipleline处理将
+ * 会最终到达tail。
+ *
+ * 对pipeline的详细实验。
+ * https://www.cnblogs.com/tianzhiliang/p/11739372.html
+ * 1、InboundHandler是通过fire事件决定是否要执行下一个InboundHandler，如果哪个InboundHandler没有调用fire事件，那么往后的Pipeline就断掉了。
+ * 2、InboundHandler是按照Pipleline的加载顺序，顺序执行。
+ * 3、OutboundHandler是按照Pipeline的加载顺序，逆序执行。
+ * 4、有效的InboundHandler是指通过fire事件能触达到的最后一个InboundHander。
+ * 5、如果想让所有的OutboundHandler都能被执行到，那么必须把OutboundHandler放在最后一个有效的InboundHandler之前。
+ * 6、推荐的做法是通过addFirst加载所有OutboundHandler，再通过addLast加载所有InboundHandler。
+ * 7、OutboundHandler是通过write方法实现Pipeline的串联的。
+ * 8、如果OutboundHandler在Pipeline的处理链上，其中一个OutboundHandler没有调用write方法，最终消息将不会发送出去。
+ * 9、ctx.writeAndFlush是从当前ChannelHandler开始，逆序向前执行OutboundHandler。
+ * 10、ctx.writeAndFlush所在ChannelHandler后面的OutboundHandler将不会被执行。
+ * 11、ctx.channel().writeAndFlush 是从最后一个OutboundHandler开始，依次逆序向前执行其他OutboundHandler，即使最后一个ChannelHandler是OutboundHandler，在InboundHandler之前，也会执行该OutbondHandler。
+ * 12、千万不要在OutboundHandler的write方法里执行ctx.channel().writeAndFlush，否则就死循环了。
+ *
  */
 public interface ChannelPipeline extends ChannelInboundInvoker, ChannelOutboundInvoker, Iterable<Entry<String, ChannelHandler>> {
 

@@ -189,6 +189,66 @@ import java.lang.annotation.Target;
  *   handlerRemoved | 当从 ChannelPipeline 中移除 ChannelHandler 时被调用
  *   exceptionCaught| 当处理过程中在 ChannelPipeline 中有错误产生时被调用
  *
+ * <h1>如何理解Netty中的Inbound和Outbound</h1>
+ *
+ * <h2>错误的理解</h2>
+ * ChannelInboundHandler、ChannelOutboundHandler，这里的inbound和outbound是
+ * 什么意思呢？inbound对应IO输入，outbound对应IO输出？这是我看到这两个名字时的第一反
+ * 应，但当我看到ChannelOutboundHandler接口中有read方法时，就开始疑惑了，应该是理解
+ * 错了，如果outbound对应IO输出，为什么这个接口里会有明显表示IO输入的read方法呢？
+ *
+ * <h2>正确的理解</h2>
+ * <a href="https://stackoverflow.com/questions/22354135/in-netty4-why-read-and-write-both-in-outboundhandler">Netty作者Trustin Lee对inbound和outbound的解释</a>
+ * 众所周知，Netty是事件驱动的，而事件分为两大类：inboud和outbound，分别由ChannelInboundHandler
+ * 和ChannelOutboundHandler负责处理。所以，inbound和outbound并非指IO的输入和输出，而是指事件类型。
+ * 那么什么样的事件属于inbound，什么样的事件属于outbound呢？也就是说，事件类型的划分依据是什么？
+ * 答案是：触发事件的源头。
+ *
+ * <h2>Inbound</h2>
+ * 由外部触发的事件是inbound事件。外部是指应用程序之外，因此inbound事件就是并非因为应用
+ * 程序主动请求做了什么而触发的事件，比如某个socket上有数据读取进来了（注意是“读完了”这个
+ * 事件，而不是“读取”这个操作），再比如某个socket连接了上来并被注册到了某个EventLoop。
+ * 即，这个事件是由操作系统或者当前应用层外的某些东西告知应用层的。
+ * Inbound事件的详细列表：
+ * <ul>
+ *     <li/>channelActive / channelInactive
+ *     <li/>channelRead
+ *     <li/>channelReadComplete
+ *     <li/>channelRegistered / channelUnregistered
+ *     <li/>channelWritabilityChanged
+ *     <li/>exceptionCaught
+ *     <li/>userEventTriggered
+ * </ul>
+ *
+ * <h2>Outbound</h2>
+ * 而outbound事件是由应用程序主动请求而触发的事件，可以认为，outbound是指应用程序发起了
+ * 某个操作。比如向socket写入数据，再比如从socket读取数据（注意是“读取”这个操作请求，而
+ * 非“读完了”这个事件），这也解释了为什么ChannelOutboundHandler中会有read方法。即，这
+ * 个事件是有本应用主动发起的。
+ * <ul>
+ *     <li/>bind
+ *     <li/>close
+ *     <li/>connect
+ *     <li/>deregister
+ *     <li/>disconnect
+ *     <li/>flush
+ *     <li/>read
+ *     <li/>write
+ * </ul>
+ * 大都是在socket上可以执行的一系列常见操作：绑定地址、建立和关闭连接、IO操作，另外还有Netty
+ * 定义的一种操作deregister：解除channel与eventloop的绑定关系。值得注意的是，一旦应用程序
+ * 发出以上操作请求，ChannelOutboundHandler中对应的方法就会被调用，而不是等到操作完毕之后才
+ * 被调用，一个handler在处理时甚至可以将请求拦截而不再传递给后续的handler，使得真正的操作并不
+ * 会被执行。
+ *
+ * <h2>Inbound events & Outbound operations</h2>
+ * 以上对inbound和outbound的理解从ChannelPipeline的Javadoc中也可以得到佐证：
+ * A list of ChannelHandlers which handles or intercepts inbound events and
+ * outbound operations of a Channel. ChannelPipeline implements an advanced
+ * form of the Intercepting Filter pattern to give a user full control over
+ * how an event is handled and how the ChannelHandlers in a pipeline interact
+ * with each other.
+ * 重点在于inbound events和outbound operations，即inbound是事件，outbound是操作（直接导致的事件）。
  *
  */
 public interface ChannelHandler {

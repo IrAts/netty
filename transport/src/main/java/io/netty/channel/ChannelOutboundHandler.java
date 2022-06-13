@@ -83,6 +83,9 @@ public interface ChannelOutboundHandler extends ChannelHandler {
     /**
      * Intercepts {@link ChannelHandlerContext#read()}.
      * 当请求从 Channel 读取更多的数据时被调用。
+     *
+     * 为什么 OutBoundHandler 里会有 read 方法？？？
+     * 详情请看 {@link ChannelHandler} 里的注释
      */
     void read(ChannelHandlerContext ctx) throws Exception;
 

@@ -692,6 +692,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     /**
+     * 当没有启用了 Selector 集合优化时会使用该方法执行IO事件。
+     *
      * 遍历{@code selectedKeys}并处理里面每一个key对应的IO事件。
      * 对于每一个 key，会通过{@link SelectionKey#attachment()}获取其关联的对象a。
      * a 有可能是一个 Netty 的 Channel，或这是一个NioTask<SelectableChannel>。
@@ -739,6 +741,8 @@ public final class NioEventLoop extends SingleThreadEventLoop {
     }
 
     /**
+     * 当启用了 Selector 集合优化时会使用该方法执行IO事件。
+     *
      * 遍历{@link #selectedKeys}并处理里面每一个key对应的IO事件。
      * 对于每一个 key，会通过{@link SelectionKey#attachment()}获取其关联的对象a。
      * a 有可能是一个 Netty 的 Channel，或这是一个NioTask<SelectableChannel>。
